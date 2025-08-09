@@ -2,20 +2,44 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getFirebaseClient, ensureAnonymousAuth } from "@/lib/firebaseClient";
-import { collection, doc, runTransaction, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 
 export default function JoinEventPage() {
   const { eventId } = useParams();
   const router = useRouter();
   const [nickname, setNickname] = useState("");
   const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState(true); // başta true ki kontrol yapalım
 
   useEffect(() => {
-    // Ensure auth is ready to create participant doc with uid as id
-    const { auth } = getFirebaseClient();
-    ensureAnonymousAuth(auth).catch(() => {});
-  }, []);
+    async function checkExistingJoin() {
+      try {
+        const { auth, db } = getFirebaseClient();
+        await ensureAnonymousAuth(auth);
+
+        const saved = localStorage.getItem(`event-${eventId}-participant`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          // Firestore'da hâlâ kayıt var mı kontrol et
+          const participantRef = doc(db, "events", eventId, "participants", parsed.uid);
+          const snap = await getDoc(participantRef);
+          if (snap.exists()) {
+            // Zaten join yapılmış, direkt camera'ya yönlendir
+            router.replace(`/events/${eventId}/camera`);
+            return;
+          } else {
+            // localStorage'da kayıt var ama Firestore'da yok → temizle
+            localStorage.removeItem(`event-${eventId}-participant`);
+          }
+        }
+      } catch (err) {
+        console.error("Join kontrolünde hata:", err);
+      }
+      setSubmitting(false); // formu göster
+    }
+
+    checkExistingJoin();
+  }, [eventId, router]);
 
   async function handleJoin(e) {
     e.preventDefault();
@@ -46,13 +70,28 @@ export default function JoinEventPage() {
           createdAt: serverTimestamp(),
         });
       });
+
+      // localStorage'a kaydet
+      localStorage.setItem(
+        `event-${eventId}-participant`,
+        JSON.stringify({ uid: auth.currentUser.uid, nickname: nick })
+      );
+
       router.push(`/events/${eventId}/camera`);
     } catch (err) {
       console.error(err);
-      setError("Failed to join. Please try again.");
+      setError(err.message || "Failed to join. Please try again.");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (submitting) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Loading...</p>
+      </div>
+    );
   }
 
   return (
@@ -78,5 +117,3 @@ export default function JoinEventPage() {
     </div>
   );
 }
-
-
