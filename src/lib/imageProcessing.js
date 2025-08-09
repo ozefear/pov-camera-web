@@ -60,13 +60,13 @@ export function renderRetroWithTimestamp(image, options = {}) {
   applySaturationVibrance(ctx, canvas.width, canvas.height, { saturation: 0.15, vibrance: 0.16 });
   applyClarityTexture(ctx, canvas.width, canvas.height, { clarity: 0.19, texture: 0.20 });
   applyVignette(ctx, canvas.width, canvas.height, 1.5);
-  applyNoise(ctx, canvas.width, canvas.height, 40, 0.5);
-  applySepia(ctx, canvas.width, canvas.height, 0.05);
+  applyNoise(ctx, canvas.width, canvas.height, 35, 0.5);
+  applySepia(ctx, canvas.width, canvas.height, 0.1);
   applyDirectionalBlur(ctx, canvas.width, canvas.height, {
     angleDeg: 3,
     radius: 3,
     steps: 8,
-    opacity: 0.04,
+    opacity: 0.1,
   });
 
   // Timestamp overlay (bottom-right) — yellowish orange with slight blur
@@ -77,8 +77,8 @@ export function renderRetroWithTimestamp(image, options = {}) {
   const metrics = ctx.measureText(ts);
   const x = canvas.width - metrics.width - padding;
   const y = canvas.height - padding;
-  ctx.shadowColor = "rgba(0,0,0,1)";
-  ctx.shadowBlur = 6;
+  ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+  ctx.shadowBlur = 8;
   ctx.fillStyle = "#f4a261"; // yellow-orange
   ctx.fillText(ts, x, y);
   ctx.restore();
