@@ -206,11 +206,11 @@ export default function GalleryPage() {
                 Select
               </label>
             )}
-            <img src={p.cloudinaryUrl || p.url} alt="photo" className="w-full h-auto block" />
+            <img src={p.url} alt="photo" className="w-full h-auto block" />
             {showComments && (
               <div className="flex flex-col gap-1 p-3 text-sm">
                 {p.comment && (
-                  <span className="truncate font-normal text-orange-800 dark:text-orange-400">
+                  <span className="truncate font-normal text-orange-600 dark:text-amber-600">
                     💬 {p.comment}
                   </span>
                 )}
@@ -223,7 +223,7 @@ export default function GalleryPage() {
             )}
             {!blurContent && (
               <a
-                href={p.cloudinaryUrl || p.url}
+                href={p.url}
                 download={`photo-${p.photoId || p.id || "local"}.jpg`}
                 className="block text-center text-sm p-2 hover:underline"
               >
