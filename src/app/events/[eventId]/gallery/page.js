@@ -152,7 +152,7 @@ export default function GalleryPage() {
             )}
             <img src={p.url} alt="photo" className="w-full h-auto block" />
             {showComments && p.comment && (
-              <figcaption className="p-2 text-sm text-gray-700 dark:text-gray-300 truncate">
+              <figcaption className="truncate">
                 💬 {p.comment}
               </figcaption>
             )}
