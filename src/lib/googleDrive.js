@@ -50,10 +50,13 @@ export async function getOrCreateEventFolder(eventId) {
 
 // Fotoğraf yükleme
 export async function uploadPhoto(eventId, photoId, buffer, mimeType = 'image/jpeg') {
-  try {
-    const folderId = await getOrCreateEventFolder(eventId);
+  console.log(`[UPLOAD] Başladı -> EventID: ${eventId}, PhotoID: ${photoId}, MimeType: ${mimeType}`);
 
-    // Mime type güvenliği
+  try {
+    console.log("[UPLOAD] Event klasörü kontrol ediliyor...");
+    const folderId = await getOrCreateEventFolder(eventId);
+    console.log("[UPLOAD] Event klasörü bulundu/oluşturuldu:", folderId);
+
     const extension = mimeType === 'image/png' ? 'png' : 'jpg';
 
     const fileMetadata = {
@@ -61,16 +64,21 @@ export async function uploadPhoto(eventId, photoId, buffer, mimeType = 'image/jp
       parents: [folderId],
     };
 
+    console.log("[UPLOAD] Dosya metadatası hazır:", fileMetadata);
+
     const media = {
       mimeType,
       body: bufferToStream(buffer),
     };
 
+    console.log("[UPLOAD] Dosya Google Drive'a yükleniyor...");
     const file = await drive.files.create({
       resource: fileMetadata,
       media: media,
       fields: 'id, webViewLink, webContentLink',
     });
+
+    console.log("[UPLOAD] Yükleme başarılı:", file.data);
 
     return {
       fileId: file.data.id,
@@ -78,7 +86,7 @@ export async function uploadPhoto(eventId, photoId, buffer, mimeType = 'image/jp
       webContentLink: file.data.webContentLink,
     };
   } catch (error) {
-    console.error('Error uploading to Google Drive:', error.response?.data || error.message);
+    console.error("[UPLOAD] HATA ->", error.response?.data || error.message || error);
     throw error;
   }
 }
