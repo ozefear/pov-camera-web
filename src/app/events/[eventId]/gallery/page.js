@@ -152,15 +152,15 @@ export default function GalleryPage() {
             )}
             <img src={p.url} alt="photo" className="w-full h-auto block" />
             {showComments && (
-              <div className="flex flex-col gap-1 p-3 text-sm text-gray-800 dark:text-gray-200">
+              <div className="flex flex-col gap-1 p-3 text-sm truncate">
                 {p.comment && (
-                  <span className="truncate font-normal">
+                  <span className="truncate font-normal text-gray-700 dark:text-gray-300">
                     💬 {p.comment}
                   </span>
                 )}
                 {p.authorParticipantId && (
                   <span className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
-                    👤 by {p.authorNickname || p.authorParticipantId}
+                    👤 @{p.authorNickname || p.authorParticipantId}
                   </span>
                 )}
               </div>
