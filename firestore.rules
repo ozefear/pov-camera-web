@@ -1,0 +1,61 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(eventId) {
+      return isSignedIn() &&
+             get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid;
+    }
+
+    function isParticipant(eventId) {
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/events/$(eventId)/participants/$(request.auth.uid));
+    }
+
+    function isRevealed(eventId) {
+      return get(/databases/$(database)/documents/events/$(eventId)).data.isRevealed == true;
+    }
+
+    match /events/{eventId} {
+      // Allow participants to read event metadata (e.g., limits),
+      // while gallery access remains controlled by photos rules.
+      allow read: if isOwner(eventId) || isParticipant(eventId) || isRevealed(eventId);
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isOwner(eventId);
+      allow delete: if false;
+
+      // Nickname reservations: doc id is nickname lowercased
+      match /nicknames/{nicknameLower} {
+        // Allow get (not list) so clients can check existence; block list to prevent enumeration
+        allow get: if isSignedIn();
+        allow list: if false;
+        // Allow create; if the doc exists, a second create becomes an update and will be denied
+        allow create: if isSignedIn();
+        allow update: if false;
+        allow delete: if isOwner(eventId);
+      }
+
+      match /participants/{participantId} {
+        allow read: if isOwner(eventId) || (isParticipant(eventId) && request.auth.uid == participantId);
+        allow create: if isSignedIn() && request.auth.uid == participantId
+                      && request.resource.data.nickname is string
+                      && request.resource.data.nickname.size() > 0
+                      && request.resource.data.uploadedCount == 0
+                      && request.resource.data.role in ['owner', 'participant'];
+        allow update: if isSignedIn() && request.auth.uid == participantId;
+        allow delete: if isOwner(eventId) || request.auth.uid == participantId;
+      }
+
+      match /photos/{photoId} {
+        allow read: if isOwner(eventId) || isRevealed(eventId);
+        allow create: if isOwner(eventId) || isParticipant(eventId);
+        allow update, delete: if isOwner(eventId);
+      }
+    }
+  }
+}
+
+

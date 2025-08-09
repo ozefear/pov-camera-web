@@ -1,0 +1,227 @@
+"use client";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { getFirebaseClient, ensureAnonymousAuth } from "@/lib/firebaseClient";
+// import { listLocalPhotosByEvent } from "@/lib/localDb";
+import JSZip from "jszip";
+async function fetchServerPhotos(eventId) {
+  const res = await fetch(`/api/events/${eventId}/photos`, { cache: "no-store" });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return (json.photos || []).map(p => ({
+    ...p,
+    url: p.downloadURL, // Use Google Drive URL
+    createdAt: p.timestamp // Use timestamp for sorting
+  }));
+}
+
+function bytesToUrl(uint8, type = "image/jpeg") {
+  try {
+    const blob = new Blob([uint8], { type });
+    return URL.createObjectURL(blob);
+  } catch {
+    return "";
+  }
+}
+
+export default function GalleryPage() {
+  const { eventId } = useParams();
+  const router = useRouter();
+  const [photos, setPhotos] = useState([]);
+  const [isOwner, setIsOwner] = useState(false);
+  const [isRevealed, setIsRevealed] = useState(false);
+  const [revealAt, setRevealAt] = useState(null);
+  const [showComments, setShowComments] = useState(true);
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [countdown, setCountdown] = useState("");
+  const [selected, setSelected] = useState(new Set());
+
+  useEffect(() => {
+    const urls = [];
+    return () => {
+      urls.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, []);
+
+  useEffect(() => {
+    const { auth, db } = getFirebaseClient();
+    ensureAnonymousAuth(auth)
+      .then(async () => {
+        const { doc, getDoc } = await import("firebase/firestore");
+        // Ensure participant exists; else redirect to join
+        const partRef = doc(db, "events", eventId, "participants", auth.currentUser.uid);
+        const partSnap = await getDoc(partRef);
+        if (!partSnap.exists()) {
+          router.replace(`/events/${eventId}/join`);
+          return;
+        }
+        const owner = partSnap.data().role === "owner";
+        setIsOwner(owner);
+
+        const eventRef = doc(db, "events", eventId);
+        const eventSnap = await getDoc(eventRef);
+        if (eventSnap.exists()) {
+          const data = eventSnap.data();
+          setIsRevealed(Boolean(data.isRevealed));
+          if (data.revealAt?.toDate) setRevealAt(data.revealAt.toDate());
+        }
+
+        const list = await fetchServerPhotos(eventId);
+        // Best-effort: resolve author nicknames by temporarily fetching participants
+        try {
+          const { doc, getDoc, collection, getDocs } = await import("firebase/firestore");
+          const { db, auth } = getFirebaseClient();
+          const partsCol = collection(db, "events", eventId, "participants");
+          const partsSnap = await getDocs(partsCol);
+          const parts = partsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          const nicknameOf = (pid) => parts.find((p) => p.id === pid)?.nickname || pid;
+          setPhotos(list.map((p) => ({ ...p, authorNickname: nicknameOf(p.authorParticipantId) })));
+        } catch {
+          setPhotos(list);
+        }
+      })
+      .catch(() => router.replace(`/events/${eventId}/join`));
+  }, [eventId]);
+
+  useEffect(() => {
+    if (!revealAt) return;
+    const interval = setInterval(() => {
+      const now = new Date();
+      const diff = revealAt - now;
+      if (diff <= 0) {
+        setCountdown("00:00:00");
+        clearInterval(interval);
+        return;
+      }
+      const h = Math.floor(diff / (1000 * 60 * 60));
+      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const s = Math.floor((diff % (1000 * 60)) / 1000);
+      const pad = (n) => String(n).padStart(2, "0");
+      setCountdown(`${pad(h)}:${pad(m)}:${pad(s)}`);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [revealAt]);
+
+  const sortedPhotos = useMemo(() => {
+    const arr = [...photos];
+    if (sortBy === "author") {
+      arr.sort((a, b) => {
+        const an = (a.authorNickname || "").toLowerCase();
+        const bn = (b.authorNickname || "").toLowerCase();
+        if (an === bn) return (b.createdAt || 0) - (a.createdAt || 0); // same author: new→old
+        return an.localeCompare(bn);
+      });
+    } else {
+      arr.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    }
+    return arr;
+  }, [photos, sortBy]);
+
+  function toggleSelect(id) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function downloadSelected() {
+    const zip = new JSZip();
+    const picks = sortedPhotos.filter((p) => selected.has(p.photoId));
+    if (picks.length === 0) return;
+    for (const p of picks) {
+      try {
+        const res = await fetch(p.url);
+        const blob = await res.blob();
+        const fname = `photo-${p.photoId}.jpg`;
+        zip.file(fname, blob);
+      } catch {}
+    }
+    const content = await zip.generateAsync({ type: "blob" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(content);
+    a.download = `photos-${eventId}.zip`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  const blurContent = !isOwner && !isRevealed;
+
+  return (
+    <div className="min-h-screen p-6 pt-16 max-w-5xl mx-auto retro-surface relative">
+      <a
+        href={`/events/${eventId}/camera`}
+        className="btn-primary absolute top-4 right-4"
+        aria-label="Open Camera"
+      >
+        <span className="inline-flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Camera
+        </span>
+      </a>
+      <div className="mb-4 pr-28">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h1 className="text-2xl font-semibold">🖼️ Gallery</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">Sort:</span>
+              <select
+                className="h-10 px-3 rounded border bg-transparent"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="createdAt">By Upload Time</option>
+                <option value="author">By Author</option>
+              </select>
+            </div>
+            <label className="flex items-center gap-2 text-sm h-10">
+              <input type="checkbox" className="h-4 w-4" checked={showComments} onChange={(e) => setShowComments(e.target.checked)} />
+              Show comments
+            </label>
+            {selected.size > 0 && (
+              <button className="btn-primary" onClick={downloadSelected}>
+                ⬇️ Download Selected ({selected.size})
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {blurContent && (
+        <div className="mb-4 p-3 rounded border bg-yellow-50 text-yellow-900">
+          The gallery will be revealed at the end of the event.
+          {revealAt && <span className="ml-2">Countdown: {countdown}</span>}
+        </div>
+      )}
+
+      <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 ${blurContent ? "blur-sm" : ""}`}>
+        {sortedPhotos.map((p) => (
+          <figure key={p.photoId || p.id} className={`rounded border overflow-hidden ${selected.has(p.photoId) ? "ring-2 ring-[var(--retro-accent)]" : ""}`}>
+            {!blurContent && (
+              <label className="flex items-center gap-2 p-2 text-sm">
+                <input className="retro-checkbox" type="checkbox" checked={selected.has(p.photoId)} onChange={() => toggleSelect(p.photoId)} />
+                Select
+              </label>
+            )}
+            <img src={p.url} alt="photo" className="w-full h-auto block" />
+            {showComments && p.comment && (
+              <figcaption className="p-2 text-sm text-gray-700 dark:text-gray-300">{p.comment}</figcaption>
+            )}
+            {!blurContent && (
+              <a
+                href={p.url}
+                download={`photo-${p.id || "local"}.jpg`}
+                className="block text-center text-sm p-2 hover:underline"
+              >
+                Download
+              </a>
+            )}
+          </figure>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
