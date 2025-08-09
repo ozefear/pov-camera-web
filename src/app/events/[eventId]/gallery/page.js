@@ -206,7 +206,7 @@ export default function GalleryPage() {
                 Select
               </label>
             )}
-            <img src={p.url} alt="photo" className="w-full h-auto block" />
+            <img src={p.cloudinaryUrl || p.url} alt="photo" className="w-full h-auto block" />
             {showComments && (
               <div className="flex flex-col gap-1 p-3 text-sm">
                 {p.comment && (
@@ -223,7 +223,7 @@ export default function GalleryPage() {
             )}
             {!blurContent && (
               <a
-                href={p.url}
+                href={p.cloudinaryUrl || p.url}
                 download={`photo-${p.photoId || p.id || "local"}.jpg`}
                 className="block text-center text-sm p-2 hover:underline"
               >
