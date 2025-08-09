@@ -59,8 +59,8 @@ export function renderRetroWithTimestamp(image, options = {}) {
   applyTemperatureTint(ctx, canvas.width, canvas.height, { temp: 6, tint: -11 });
   applySaturationVibrance(ctx, canvas.width, canvas.height, { saturation: 0.15, vibrance: 0.16 });
   applyClarityTexture(ctx, canvas.width, canvas.height, { clarity: 0.19, texture: 0.20 });
-  applyVignette(ctx, canvas.width, canvas.height, 1);
-  applyNoise(ctx, canvas.width, canvas.height, 100, 0.5);
+  applyVignette(ctx, canvas.width, canvas.height, 1.5);
+  applyNoise(ctx, canvas.width, canvas.height, 40, 0.5);
   applySepia(ctx, canvas.width, canvas.height, 0.05);
   applyDirectionalBlur(ctx, canvas.width, canvas.height, {
     angleDeg: 3,
