@@ -2,22 +2,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getFirebaseClient, ensureAnonymousAuth } from "@/lib/firebaseClient";
-// import { listLocalPhotosByEvent } from "@/lib/localDb";
 import JSZip from "jszip";
+
 async function fetchServerPhotos(eventId) {
   const res = await fetch(`/api/events/${eventId}/photos`, { cache: "no-store" });
   if (!res.ok) return [];
   const json = await res.json();
   return json.photos || [];
-}
-
-function bytesToUrl(uint8, type = "image/jpeg") {
-  try {
-    const blob = new Blob([uint8], { type });
-    return URL.createObjectURL(blob);
-  } catch {
-    return "";
-  }
 }
 
 export default function GalleryPage() {
@@ -33,26 +24,17 @@ export default function GalleryPage() {
   const [selected, setSelected] = useState(new Set());
 
   useEffect(() => {
-    const urls = [];
-    return () => {
-      urls.forEach((u) => URL.revokeObjectURL(u));
-    };
-  }, []);
-
-  useEffect(() => {
     const { auth, db } = getFirebaseClient();
     ensureAnonymousAuth(auth)
       .then(async () => {
         const { doc, getDoc } = await import("firebase/firestore");
-        // Ensure participant exists; else redirect to join
         const partRef = doc(db, "events", eventId, "participants", auth.currentUser.uid);
         const partSnap = await getDoc(partRef);
         if (!partSnap.exists()) {
           router.replace(`/events/${eventId}/join`);
           return;
         }
-        const owner = partSnap.data().role === "owner";
-        setIsOwner(owner);
+        setIsOwner(partSnap.data().role === "owner");
 
         const eventRef = doc(db, "events", eventId);
         const eventSnap = await getDoc(eventRef);
@@ -63,10 +45,8 @@ export default function GalleryPage() {
         }
 
         const list = await fetchServerPhotos(eventId);
-        // Best-effort: resolve author nicknames by temporarily fetching participants
         try {
-          const { doc, getDoc, collection, getDocs } = await import("firebase/firestore");
-          const { db, auth } = getFirebaseClient();
+          const { collection, getDocs } = await import("firebase/firestore");
           const partsCol = collection(db, "events", eventId, "participants");
           const partsSnap = await getDocs(partsCol);
           const parts = partsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -104,7 +84,7 @@ export default function GalleryPage() {
       arr.sort((a, b) => {
         const an = (a.authorNickname || "").toLowerCase();
         const bn = (b.authorNickname || "").toLowerCase();
-        if (an === bn) return (b.createdAt || 0) - (a.createdAt || 0); // same author: new→old
+        if (an === bn) return (b.createdAt || 0) - (a.createdAt || 0);
         return an.localeCompare(bn);
       });
     } else {
@@ -128,7 +108,7 @@ export default function GalleryPage() {
     if (picks.length === 0) return;
     for (const p of picks) {
       try {
-        const res = await fetch(p.url);
+        const res = await fetch(p.cloudinaryUrl);
         const blob = await res.blob();
         const fname = `photo-${p.photoId}.jpg`;
         zip.file(fname, blob);
@@ -152,7 +132,10 @@ export default function GalleryPage() {
         aria-label="Open Camera"
       >
         <span className="inline-flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
           Camera
         </span>
       </a>
@@ -196,18 +179,23 @@ export default function GalleryPage() {
           <figure key={p.photoId || p.id} className={`rounded border overflow-hidden ${selected.has(p.photoId) ? "ring-2 ring-[var(--retro-accent)]" : ""}`}>
             {!blurContent && (
               <label className="flex items-center gap-2 p-2 text-sm">
-                <input className="retro-checkbox" type="checkbox" checked={selected.has(p.photoId)} onChange={() => toggleSelect(p.photoId)} />
+                <input
+                  className="retro-checkbox"
+                  type="checkbox"
+                  checked={selected.has(p.photoId)}
+                  onChange={() => toggleSelect(p.photoId)}
+                />
                 Select
               </label>
             )}
-            <img src={p.url} alt="photo" className="w-full h-auto block" />
+            <img src={p.cloudinaryUrl} alt={p.comment || "photo"} className="w-full h-auto block" />
             {showComments && p.comment && (
               <figcaption className="p-2 text-sm text-gray-700 dark:text-gray-300">{p.comment}</figcaption>
             )}
             {!blurContent && (
               <a
-                href={p.url}
-                download={`photo-${p.id || "local"}.jpg`}
+                href={p.cloudinaryUrl}
+                download={`photo-${p.photoId || "local"}.jpg`}
                 className="block text-center text-sm p-2 hover:underline"
               >
                 Download
@@ -219,5 +207,3 @@ export default function GalleryPage() {
     </div>
   );
 }
-
-
