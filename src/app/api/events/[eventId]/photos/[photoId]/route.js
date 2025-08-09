@@ -1,6 +1,6 @@
 import { v2 as cloudinary } from "cloudinary";
 import { getFirebaseClient } from "@/lib/firebaseClient";
-import { doc, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, deleteDoc } from "firebase/firestore";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
