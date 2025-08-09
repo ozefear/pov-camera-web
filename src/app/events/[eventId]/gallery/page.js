@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getFirebaseClient, ensureAnonymousAuth } from "@/lib/firebaseClient";
+import JSZip from "jszip";
 
 async function fetchServerPhotos(eventId) {
   const res = await fetch(`/api/events/${eventId}/photos`, { cache: "no-store" });
@@ -13,25 +14,27 @@ async function fetchServerPhotos(eventId) {
 export default function GalleryPage() {
   const { eventId } = useParams();
   const router = useRouter();
-
   const [photos, setPhotos] = useState([]);
   const [isOwner, setIsOwner] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
   const [revealAt, setRevealAt] = useState(null);
   const [showComments, setShowComments] = useState(true);
-  const [selected, setSelected] = useState(new Set());
-  const [participants, setParticipants] = useState([]);
-
-  // Reveal countdown timer
+  const [sortBy, setSortBy] = useState("createdAt");
   const [countdown, setCountdown] = useState("");
+  const [selected, setSelected] = useState(new Set());
+
+  useEffect(() => {
+    const urls = [];
+    return () => {
+      urls.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, []);
 
   useEffect(() => {
     const { auth, db } = getFirebaseClient();
     ensureAnonymousAuth(auth)
       .then(async () => {
         const { doc, getDoc, collection, getDocs } = await import("firebase/firestore");
-
-        // Katılımcı kontrolü
         const partRef = doc(db, "events", eventId, "participants", auth.currentUser.uid);
         const partSnap = await getDoc(partRef);
         if (!partSnap.exists()) {
@@ -40,7 +43,6 @@ export default function GalleryPage() {
         }
         setIsOwner(partSnap.data().role === "owner");
 
-        // Etkinlik bilgisi
         const eventRef = doc(db, "events", eventId);
         const eventSnap = await getDoc(eventRef);
         if (eventSnap.exists()) {
@@ -49,26 +51,21 @@ export default function GalleryPage() {
           if (data.revealAt?.toDate) setRevealAt(data.revealAt.toDate());
         }
 
-        // Katılımcıları çek
-        const partsCol = collection(db, "events", eventId, "participants");
-        const partsSnap = await getDocs(partsCol);
-        const partsList = partsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setParticipants(partsList);
+        const list = await fetchServerPhotos(eventId);
 
-        // Fotoğrafları çek
-        const serverPhotos = await fetchServerPhotos(eventId);
-        // Author nickname eşleştirmesi
-        const enrichedPhotos = serverPhotos.map((p) => ({
-          ...p,
-          authorNickname: partsList.find((pp) => pp.id === p.authorParticipantId)?.nickname || p.authorParticipantId || "Unknown",
-          url: p.cloudinaryUrl || p.url || "",
-        }));
-        setPhotos(enrichedPhotos);
+        try {
+          const partsCol = collection(db, "events", eventId, "participants");
+          const partsSnap = await getDocs(partsCol);
+          const parts = partsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          const nicknameOf = (pid) => parts.find((p) => p.id === pid)?.nickname || pid;
+          setPhotos(list.map((p) => ({ ...p, authorNickname: nicknameOf(p.authorParticipantId) })));
+        } catch {
+          setPhotos(list);
+        }
       })
       .catch(() => router.replace(`/events/${eventId}/join`));
   }, [eventId]);
 
-  // Reveal countdown
   useEffect(() => {
     if (!revealAt) return;
     const interval = setInterval(() => {
@@ -88,6 +85,21 @@ export default function GalleryPage() {
     return () => clearInterval(interval);
   }, [revealAt]);
 
+  const sortedPhotos = useMemo(() => {
+    const arr = [...photos];
+    if (sortBy === "author") {
+      arr.sort((a, b) => {
+        const an = (a.authorNickname || "").toLowerCase();
+        const bn = (b.authorNickname || "").toLowerCase();
+        if (an === bn) return (b.createdAt || 0) - (a.createdAt || 0);
+        return an.localeCompare(bn);
+      });
+    } else {
+      arr.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    }
+    return arr;
+  }, [photos, sortBy]);
+
   function toggleSelect(id) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -95,6 +107,26 @@ export default function GalleryPage() {
       else next.add(id);
       return next;
     });
+  }
+
+  async function downloadSelected() {
+    const zip = new JSZip();
+    const picks = sortedPhotos.filter((p) => selected.has(p.photoId));
+    if (picks.length === 0) return;
+    for (const p of picks) {
+      try {
+        const res = await fetch(p.url);
+        const blob = await res.blob();
+        const fname = `photo-${p.photoId}.jpg`;
+        zip.file(fname, blob);
+      } catch {}
+    }
+    const content = await zip.generateAsync({ type: "blob" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(content);
+    a.download = `photos-${eventId}.zip`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   }
 
   const blurContent = !isOwner && !isRevealed;
@@ -114,15 +146,33 @@ export default function GalleryPage() {
       <div className="mb-4 pr-28">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h1 className="text-2xl font-semibold">🖼️ Gallery</h1>
-          <label className="flex items-center gap-2 text-sm h-10">
-            <input
-              type="checkbox"
-              className="h-4 w-4"
-              checked={showComments}
-              onChange={(e) => setShowComments(e.target.checked)}
-            />
-            Show comments
-          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">Sort:</span>
+              <select
+                className="h-10 px-3 rounded border bg-transparent"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="createdAt">By Upload Time</option>
+                <option value="author">By Author</option>
+              </select>
+            </div>
+            <label className="flex items-center gap-2 text-sm h-10">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={showComments}
+                onChange={(e) => setShowComments(e.target.checked)}
+              />
+              Show comments
+            </label>
+            {selected.size > 0 && (
+              <button className="btn-primary" onClick={downloadSelected}>
+                ⬇️ Download Selected ({selected.size})
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -133,11 +183,17 @@ export default function GalleryPage() {
         </div>
       )}
 
-      <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 ${blurContent ? "blur-sm" : ""}`}>
-        {photos.map((p) => (
+      <div
+        className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 ${
+          blurContent ? "blur-sm" : ""
+        }`}
+      >
+        {sortedPhotos.map((p) => (
           <figure
             key={p.photoId || p.id}
-            className={`rounded border overflow-hidden flex flex-col ${selected.has(p.photoId) ? "ring-2 ring-[var(--retro-accent)]" : ""}`}
+            className={`rounded border overflow-hidden flex flex-col ${
+              selected.has(p.photoId) ? "ring-2 ring-[var(--retro-accent)]" : ""
+            }`}
           >
             {!blurContent && (
               <label className="flex items-center gap-2 p-2 text-sm">
@@ -152,15 +208,15 @@ export default function GalleryPage() {
             )}
             <img src={p.url} alt="photo" className="w-full h-auto block" />
             {showComments && (
-              <div className="flex flex-col gap-1 p-3 text-sm truncate">
+              <div className="flex flex-col gap-1 p-3 text-sm">
                 {p.comment && (
-                  <span className="truncate font-normal text-gray-700 dark:text-gray-300">
+                  <span className="truncate font-normal text-orange-800 dark:text-orange-400">
                     💬 {p.comment}
                   </span>
                 )}
                 {p.authorParticipantId && (
                   <span className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
-                    👤 @{p.authorNickname || p.authorParticipantId}
+                    👤 by {p.authorNickname || p.authorParticipantId}
                   </span>
                 )}
               </div>
