@@ -17,7 +17,7 @@ export async function DELETE(_req, { params }) {
     const photoRef = doc(db, "events", eventId, "photos", photoId);
 
     // Firestore’dan önce public_id çekmeliyiz ki Cloudinary’den silelim
-    const snapshot = await photoRef.get ? await photoRef.get() : null;
+    const snapshot = await getDoc(photoRef);
     let publicId = null;
     if (snapshot && snapshot.exists()) {
       publicId = snapshot.data().cloudinaryPublicId;
