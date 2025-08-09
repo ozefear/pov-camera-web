@@ -51,8 +51,6 @@ export async function POST(req, { params }) {
     const result = await streamUpload();
 
     // Metadata dosyasını local olarak kaydetmek (opsiyonel)
-    const uploadsDir = path.join(process.cwd(), "uploads", "events", eventId);
-    await fs.mkdir(uploadsDir, { recursive: true });
 
     const metadata = {
       photoId,
@@ -68,8 +66,6 @@ export async function POST(req, { params }) {
       cloudinaryPublicId: result.public_id,
     };
 
-    const metaPath = path.join(uploadsDir, `${photoId}.json`);
-    await fs.writeFile(metaPath, JSON.stringify(metadata, null, 2), "utf8");
 
     return new Response(
       JSON.stringify({
