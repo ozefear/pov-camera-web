@@ -154,7 +154,7 @@ export default function GalleryPage() {
             {showComments && (
               <div className="flex flex-col gap-1 p-3 text-sm text-gray-800 dark:text-gray-200">
                 {p.comment && (
-                  <span className="truncate font-normal text-gray-700 dark:text-gray-300">
+                  <span className="truncate font-normal">
                     💬 {p.comment}
                   </span>
                 )}
