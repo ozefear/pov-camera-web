@@ -63,10 +63,10 @@ export function renderRetroWithTimestamp(image, options = {}) {
   applyNoise(ctx, canvas.width, canvas.height, 35, 0.5);
   applySepia(ctx, canvas.width, canvas.height, 0.1);
   applyDirectionalBlur(ctx, canvas.width, canvas.height, {
-    angleDeg: 3,
-    radius: 3,
-    steps: 8,
-    opacity: 0.1,
+    angleDeg: 5,
+    radius: 4,
+    steps: 5,
+    opacity: 0.06,
   });
 
   // Timestamp overlay (bottom-right) — yellowish orange with slight blur
