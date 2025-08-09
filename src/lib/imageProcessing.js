@@ -24,7 +24,7 @@ function loadImage(src) {
 
 // Crop to 4:5 portrait and render with a simple retro effect and timestamp overlay
 export function renderRetroWithTimestamp(image, options = {}) {
-  const { timestamp = new Date(), outputWidth = 1200 } = options;
+  const { timestamp = new Date() } = options;
   // Dynamic aspect: portrait -> 4:5, landscape -> 5:4
   const srcW = image.naturalWidth || image.width;
   const srcH = image.naturalHeight || image.height;
@@ -45,7 +45,18 @@ export function renderRetroWithTimestamp(image, options = {}) {
   const sx = Math.floor((srcW - cropW) / 2);
   const sy = Math.floor((srcH - cropH) / 2);
 
-  const outputHeight = Math.floor(outputWidth * (aspectH / aspectW));
+  // Set output size based on aspect
+  let outputWidth, outputHeight;
+  if (!isLandscape) {
+    // 4:5 portrait
+    outputWidth = 1200;
+    outputHeight = 1500;
+  } else {
+    // 5:4 landscape
+    outputWidth = 1500;
+    outputHeight = 1200;
+  }
+
   const canvas = document.createElement("canvas");
   canvas.width = outputWidth;
   canvas.height = outputHeight;
