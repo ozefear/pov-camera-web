@@ -1,75 +1,50 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getFirestore, doc, getDoc, updateDoc, increment } from 'firebase/firestore';
-import { initializeApp } from 'firebase/app';
-import { getPhoto, deletePhoto } from '@/lib/googleDrive';
+import { promises as fs } from "fs";
+import path from "path";
+import { v2 as cloudinary } from "cloudinary";
 
-// Initialize Firebase
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
+// Cloudinary konfigurasyonu (eğer başka yerde config ettiysen buna gerek yok ama güvenli için ekleyebilirsin)
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true,
+});
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+export async function DELETE(req, { params }) {
+  // Next.js 13 sürümlerinde params bir Promise olabilir, bu yüzden await kullanıyoruz
+  const { eventId, photoId } = await params;
 
-export async function GET(request, { params }) {
   try {
-    const { photoId } = params;
-    
-    // Extract fileId from photoId (assuming format: nickname_timestamp)
-    // For now, we'll need to store fileId in Firestore or use a different approach
-    // This is a simplified version - you might want to store fileId in Firestore
-    
-    // For this example, we'll redirect to the Google Drive URL
-    // In a real implementation, you'd store the fileId in Firestore
-    
-    return NextResponse.json({ error: 'Direct file access not implemented' }, { status: 404 });
-    
-  } catch (error) {
-    console.error('Get photo error:', error);
-    return NextResponse.json({ error: 'Photo not found' }, { status: 404 });
+    const uploadsDir = path.join(process.cwd(), "uploads", "events", eventId);
+    const metaPath = path.join(uploadsDir, `${photoId}.json`);
+
+    // Metadata dosyasını oku ki Cloudinary public_id alabilelim
+    let metadata;
+    try {
+      const raw = await fs.readFile(metaPath, "utf8");
+      metadata = JSON.parse(raw);
+    } catch {
+      metadata = null;
+    }
+
+    // Cloudinary fotoğrafını sil
+    if (metadata?.cloudinaryPublicId) {
+      await cloudinary.uploader.destroy(metadata.cloudinaryPublicId, { resource_type: "image" });
+    }
+
+    // Local dosyaları sil (opsiyonel, eğer localde varsa)
+    const imgPath = path.join(uploadsDir, `${photoId}.jpg`);
+    try {
+      await fs.unlink(imgPath);
+    } catch {}
+
+    try {
+      await fs.unlink(metaPath);
+    } catch {}
+
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
+  } catch (e) {
+    console.error(e);
+    return new Response(JSON.stringify({ message: "Delete failed", error: e.message }), { status: 500 });
   }
 }
-
-export async function DELETE(request, { params }) {
-  try {
-    const { eventId, photoId } = params;
-    
-    // Parse photoId to get nickname
-    const [nickname, timestamp] = photoId.split('_');
-    
-    // For this implementation, we need to get the fileId from Firestore
-    // You should store the fileId when uploading photos
-    
-    // This is a simplified version - in practice, you'd store fileId in Firestore
-    // and retrieve it here for deletion
-    
-    // For now, we'll return an error
-    return NextResponse.json({ error: 'Delete not implemented - need fileId storage' }, { status: 500 });
-    
-    // Once you have fileId:
-    // await deletePhoto(fileId);
-    
-    // Refund participant's upload count
-    // const participantRef = doc(db, 'events', eventId, 'participants', nickname);
-    // const participantDoc = await getDoc(participantRef);
-    
-    // if (participantDoc.exists()) {
-    //   await updateDoc(participantRef, {
-    //     uploadedCount: increment(-1)
-    //   });
-    // }
-    
-    // return NextResponse.json({ success: true });
-    
-  } catch (error) {
-    console.error('Delete photo error:', error);
-    return NextResponse.json({ error: 'Failed to delete photo' }, { status: 500 });
-  }
-}
-
-

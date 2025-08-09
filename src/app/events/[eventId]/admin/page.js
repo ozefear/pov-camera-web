@@ -10,11 +10,7 @@ async function fetchServerPhotos(eventId) {
   const res = await fetch(`/api/events/${eventId}/photos`, { cache: "no-store" });
   if (!res.ok) return [];
   const json = await res.json();
-  return (json.photos || []).map(p => ({
-    ...p,
-    url: p.downloadURL, // Use Google Drive URL
-    createdAt: p.timestamp // Use timestamp for sorting
-  }));
+  return json.photos || [];
 }
 
 export default function AdminPage() {
@@ -111,26 +107,28 @@ export default function AdminPage() {
       const canvas = renderRetroWithTimestamp(img, { timestamp: new Date() });
       const blob = await canvasToBlob(canvas, "image/jpeg", 0.9);
 
-      const formData = new FormData();
-      formData.append('photo', blob, 'photo.jpg');
-      formData.append('nickname', event?.ownerNickname || 'Owner');
-      formData.append('isOwner', 'true');
-      
-      const res = await fetch(`/api/events/${eventId}/photos`, { 
-        method: "POST", 
-        body: formData 
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Upload failed");
-      }
-      
-      const result = await res.json();
-      
-      // Refresh photos list
-      const updatedPhotos = await fetchServerPhotos(eventId);
-      setPhotos(updatedPhotos);
+      const form = new FormData();
+      form.append("file", new File([blob], "photo.jpg", { type: "image/jpeg" }));
+      if (comment?.trim()) form.append("comment", comment.trim().slice(0, 250));
+      form.append("capturedAt", String(Date.now()));
+      form.append("participantId", auth.currentUser.uid);
+      const res = await fetch(`/api/events/${eventId}/photos`, { method: "POST", body: form });
+      if (!res.ok) throw new Error("Upload failed");
+      const { metadata } = await res.json();
+      // Increment uploadedCount for owner participant
+      try {
+        const { runTransaction, doc } = await import("firebase/firestore");
+        await runTransaction(db, async (tx) => {
+          const partRef = doc(db, "events", eventId, "participants", auth.currentUser.uid);
+          const snap = await tx.get(partRef);
+          const uploaded = snap.exists() ? (snap.data().uploadedCount || 0) : 0;
+          tx.set(partRef, { uploadedCount: uploaded + 1 }, { merge: true });
+        });
+        // Reflect in local UI
+        setParticipants((arr) => arr.map((p) => p.id === auth.currentUser.uid ? { ...p, uploadedCount: (p.uploadedCount || 0) + 1 } : p));
+      } catch {}
+      // Prepend to photos grid
+      setPhotos((arr) => [{ ...metadata, url: `/api/events/${eventId}/photos/${metadata.photoId}` }, ...arr]);
       setFile(null);
       setPreviewUrl("");
       setComment("");
@@ -181,7 +179,8 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/events/${eventId}/photos/${photo.photoId}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Delete failed");
-      // Refund contributor uploadedCount
+  
+      // Eğer varsa kullanıcı yükleme sayısını azalt
       if (photo.authorParticipantId) {
         try {
           const { db } = getFirebaseClient();
@@ -195,11 +194,13 @@ export default function AdminPage() {
           });
         } catch {}
       }
+  
       setPhotos((arr) => arr.filter((p) => p.photoId !== photo.photoId));
     } catch (e) {
       setError("Failed to delete photo");
     }
   }
+  
 
   const totalUploads = useMemo(() => participants.reduce((s, p) => s + (p.uploadedCount || 0), 0), [participants]);
   const filteredPhotos = useMemo(() => {

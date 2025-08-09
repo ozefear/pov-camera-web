@@ -1,131 +1,116 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getFirestore, doc, getDoc, updateDoc, increment } from 'firebase/firestore';
-import { initializeApp } from 'firebase/app';
-import { uploadPhoto, listEventPhotos, getPublicUrl } from '@/lib/googleDrive';
+import { promises as fs } from "fs";
+import path from "path";
+import { randomUUID } from "crypto";
+import { v2 as cloudinary } from "cloudinary";
 
-// Initialize Firebase
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
+// Cloudinary konfigurasyonu
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true,
+});
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+export async function POST(req, { params }) {
+  const { eventId } = params;
 
-export async function POST(request, { params }) {
   try {
-    const { eventId } = params;
-    const formData = await request.formData();
-    const file = formData.get('photo');
-    const nickname = formData.get('nickname');
-    const isOwner = formData.get('isOwner') === 'true';
+    const form = await req.formData();
+    const file = form.get("file");
+    const comment = form.get("comment") || null;
+    const capturedAt = form.get("capturedAt") || null;
+    const authorParticipantId = form.get("participantId") || null;
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    if (!file || typeof file.arrayBuffer !== "function") {
+      return new Response(JSON.stringify({ message: "Missing file" }), { status: 400 });
     }
 
-    // Check event exists and get photo limit
-    const eventRef = doc(db, 'events', eventId);
-    const eventDoc = await getDoc(eventRef);
-    
-    if (!eventDoc.exists()) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
-    }
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const photoId = randomUUID();
 
-    const eventData = eventDoc.data();
-    const photoLimit = eventData.photoLimit || 10;
-
-    // Check participant's upload count
-    if (!isOwner) {
-      const participantRef = doc(db, 'events', eventId, 'participants', nickname);
-      const participantDoc = await getDoc(participantRef);
-      
-      if (!participantDoc.exists()) {
-        return NextResponse.json({ error: 'Participant not found' }, { status: 404 });
-      }
-
-      const participantData = participantDoc.data();
-      if (participantData.uploadedCount >= photoLimit) {
-        return NextResponse.json({ error: 'Photo limit reached' }, { status: 400 });
-      }
-    }
-
-    // Convert file to buffer for Google Drive
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
-    // Upload to Google Drive
-    const timestamp = Date.now();
-    const photoId = `${nickname}_${timestamp}`;
-
-    const uploadResult = await uploadPhoto(eventId, photoId, buffer, file.type);
-    
-    // Get public URL for the photo
-    const publicUrl = await getPublicUrl(uploadResult.fileId);
-
-    // Update participant's upload count
-    if (!isOwner) {
-      const participantRef = doc(db, 'events', eventId, 'participants', nickname);
-      await updateDoc(participantRef, {
-        uploadedCount: increment(1)
+    // Cloudinary upload stream fonksiyonu
+    const streamUpload = () =>
+      new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            resource_type: "image",
+            folder: `events/${eventId}`,
+            public_id: photoId,
+            overwrite: false,
+            format: "jpg",
+          },
+          (error, result) => {
+            if (result) resolve(result);
+            else reject(error);
+          }
+        );
+        stream.end(buffer);
       });
-    }
 
-    return NextResponse.json({ 
-      success: true, 
+    const result = await streamUpload();
+
+    // Metadata dosyasını local olarak kaydetmek (opsiyonel)
+    const uploadsDir = path.join(process.cwd(), "uploads", "events", eventId);
+    await fs.mkdir(uploadsDir, { recursive: true });
+
+    const metadata = {
       photoId,
-      fileId: uploadResult.fileId,
-      downloadURL: publicUrl,
-      timestamp 
-    });
+      eventId,
+      originalName: typeof file.name === "string" ? file.name : undefined,
+      contentType: file.type || "image/jpeg",
+      size: buffer.length,
+      comment: comment ? String(comment).slice(0, 250) : null,
+      capturedAt: capturedAt || null,
+      createdAt: Date.now(),
+      authorParticipantId,
+      cloudinaryUrl: result.secure_url,
+      cloudinaryPublicId: result.public_id,
+    };
 
-  } catch (error) {
-    console.error('Upload error:', error);
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+    const metaPath = path.join(uploadsDir, `${photoId}.json`);
+    await fs.writeFile(metaPath, JSON.stringify(metadata, null, 2), "utf8");
+
+    return new Response(
+      JSON.stringify({
+        photoId,
+        url: result.secure_url,
+        metadata,
+      }),
+      { status: 201 }
+    );
+  } catch (e) {
+    console.error(e);
+    return new Response(JSON.stringify({ message: "Upload failed", error: e.message }), { status: 500 });
   }
 }
 
-export async function GET(request, { params }) {
-  try {
-    const { eventId } = params;
-    const { searchParams } = new URL(request.url);
-    const nickname = searchParams.get('nickname');
+export async function GET(_req, { params }) {
+  const { eventId } = params;
 
-    // List all photos from Google Drive
-    const drivePhotos = await listEventPhotos(eventId);
+  try {
+    const uploadsDir = path.join(process.cwd(), "uploads", "events", eventId);
+    const entries = await fs.readdir(uploadsDir, { withFileTypes: true });
+    const metas = entries
+      .filter((e) => e.isFile() && e.name.endsWith(".json"))
+      .map((e) => path.join(uploadsDir, e.name));
 
     const photos = [];
-    for (const drivePhoto of drivePhotos) {
-      const [photoNickname, timestamp] = drivePhoto.photoId.split('_');
-      
-      // Filter by nickname if specified
-      if (nickname && photoNickname !== nickname) {
-        continue;
-      }
-
-      photos.push({
-        photoId: drivePhoto.photoId,
-        fileId: drivePhoto.fileId,
-        downloadURL: drivePhoto.webContentLink,
-        nickname: photoNickname,
-        timestamp: parseInt(timestamp),
-        uploadTime: new Date(drivePhoto.createdTime).toISOString()
-      });
+    for (const metaPath of metas) {
+      try {
+        const raw = await fs.readFile(metaPath, "utf8");
+        const meta = JSON.parse(raw);
+        photos.push({ ...meta, url: meta.cloudinaryUrl });
+      } catch {}
     }
+    photos.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
-    // Sort by upload time (newest first)
-    photos.sort((a, b) => b.timestamp - a.timestamp);
-
-    return NextResponse.json({ photos });
-
-  } catch (error) {
-    console.error('List photos error:', error);
-    return NextResponse.json({ error: 'Failed to list photos' }, { status: 500 });
+    return new Response(JSON.stringify({ photos }), { status: 200 });
+  } catch (e) {
+    if (e && e.code === "ENOENT") {
+      return new Response(JSON.stringify({ photos: [] }), { status: 200 });
+    }
+    console.error(e);
+    return new Response(JSON.stringify({ message: "Failed to list" }), { status: 500 });
   }
 }
-
-

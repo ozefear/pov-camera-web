@@ -94,20 +94,15 @@ export default function CameraPage() {
       const canvas = renderRetroWithTimestamp(img, { timestamp: new Date() });
       const blob = await canvasToBlob(canvas, "image/jpeg", 0.9);
 
-      // Upload to Google Drive via API route
-      const formData = new FormData();
-      formData.append('photo', blob, 'photo.jpg');
-      formData.append('nickname', participantNickname);
-      formData.append('isOwner', limitState.owner.toString());
-      
-      const res = await fetch(`/api/events/${eventId}/photos`, { 
-        method: "POST", 
-        body: formData 
-      });
-      
+      // Upload to server filesystem via API route
+      const form = new FormData();
+      form.append("file", new File([blob], "photo.jpg", { type: "image/jpeg" }));
+      if (comment?.trim()) form.append("comment", comment.trim().slice(0, 250));
+      form.append("capturedAt", String(Date.now()));
+      form.append("participantId", auth.currentUser.uid);
+      const res = await fetch(`/api/events/${eventId}/photos`, { method: "POST", body: form });
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Upload failed");
+        throw new Error("Server upload failed");
       }
 
       setSuccess(true);

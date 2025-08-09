@@ -8,11 +8,7 @@ async function fetchServerPhotos(eventId) {
   const res = await fetch(`/api/events/${eventId}/photos`, { cache: "no-store" });
   if (!res.ok) return [];
   const json = await res.json();
-  return (json.photos || []).map(p => ({
-    ...p,
-    url: p.downloadURL, // Use Google Drive URL
-    createdAt: p.timestamp // Use timestamp for sorting
-  }));
+  return json.photos || [];
 }
 
 function bytesToUrl(uint8, type = "image/jpeg") {
