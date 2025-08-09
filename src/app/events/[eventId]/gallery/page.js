@@ -22,7 +22,7 @@ export default function GalleryPage() {
   const [selected, setSelected] = useState(new Set());
   const [participants, setParticipants] = useState([]);
 
-  // Countdown state
+  // Reveal countdown timer
   const [countdown, setCountdown] = useState("");
 
   useEffect(() => {
@@ -31,7 +31,7 @@ export default function GalleryPage() {
       .then(async () => {
         const { doc, getDoc, collection, getDocs } = await import("firebase/firestore");
 
-        // Participant kontrolü
+        // Katılımcı kontrolü
         const partRef = doc(db, "events", eventId, "participants", auth.currentUser.uid);
         const partSnap = await getDoc(partRef);
         if (!partSnap.exists()) {
@@ -40,7 +40,7 @@ export default function GalleryPage() {
         }
         setIsOwner(partSnap.data().role === "owner");
 
-        // Event bilgileri
+        // Etkinlik bilgisi
         const eventRef = doc(db, "events", eventId);
         const eventSnap = await getDoc(eventRef);
         if (eventSnap.exists()) {
@@ -68,7 +68,7 @@ export default function GalleryPage() {
       .catch(() => router.replace(`/events/${eventId}/join`));
   }, [eventId]);
 
-  // Reveal countdown timer
+  // Reveal countdown
   useEffect(() => {
     if (!revealAt) return;
     const interval = setInterval(() => {
@@ -151,15 +151,19 @@ export default function GalleryPage() {
               </label>
             )}
             <img src={p.url} alt="photo" className="w-full h-auto block" />
-            {showComments && p.comment && (
-              <figcaption className="truncate">
-                💬 {p.comment}
-              </figcaption>
-            )}
-            {showComments && p.authorParticipantId && (
-              <figcaption className="p-2 text-xs text-gray-500 truncate">
-                👤 {p.authorNickname || p.authorParticipantId}
-              </figcaption>
+            {showComments && (
+              <div className="flex flex-col gap-1 p-3 text-sm text-gray-800 dark:text-gray-200">
+                {p.comment && (
+                  <span className="truncate font-normal text-gray-700 dark:text-gray-300">
+                    💬 {p.comment}
+                  </span>
+                )}
+                {p.authorParticipantId && (
+                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
+                    👤 by {p.authorNickname || p.authorParticipantId}
+                  </span>
+                )}
+              </div>
             )}
             {!blurContent && (
               <a
