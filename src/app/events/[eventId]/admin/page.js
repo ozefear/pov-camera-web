@@ -73,8 +73,13 @@ export default function AdminPage() {
         // Photos from server
         const serverPhotos = await fetchServerPhotos(eventId);
         // Enrich photo list with resolved author nickname if available
-        const mapNickname = (pid) => participants.find((pp) => pp.id === pid)?.nickname || pid;
-        const enriched = serverPhotos.map((p) => ({ ...p, authorNickname: mapNickname(p.authorParticipantId) }));
+        const mapNickname = (pid) => list.find((pp) => pp.id === pid)?.nickname || pid;
+        const enriched = serverPhotos.map((p) => ({
+          ...p,
+          authorNickname: mapNickname(p.authorParticipantId),
+          // url değişimi:
+          url: p.cloudinaryUrl || p.url || "", 
+        }));
         setPhotos(enriched);
       })
       .catch(() => {
@@ -124,11 +129,14 @@ export default function AdminPage() {
           const uploaded = snap.exists() ? (snap.data().uploadedCount || 0) : 0;
           tx.set(partRef, { uploadedCount: uploaded + 1 }, { merge: true });
         });
-        // Reflect in local UI
-        setParticipants((arr) => arr.map((p) => p.id === auth.currentUser.uid ? { ...p, uploadedCount: (p.uploadedCount || 0) + 1 } : p));
+        setParticipants((arr) => arr.map((p) =>
+          p.id === auth.currentUser.uid ? { ...p, uploadedCount: (p.uploadedCount || 0) + 1 } : p
+        ));
       } catch {}
-      // Prepend to photos grid
-      setPhotos((arr) => [{ ...metadata, url: `/api/events/${eventId}/photos/${metadata.photoId}` }, ...arr]);
+
+      // Fotoğrafı cloudinaryUrl olarak ekleyelim
+      setPhotos((arr) => [{ ...metadata, url: metadata.cloudinaryUrl || "", authorNickname: event?.ownerNickname || "", photoId: metadata.photoId }, ...arr]);
+
       setFile(null);
       setPreviewUrl("");
       setComment("");
@@ -179,8 +187,8 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/events/${eventId}/photos/${photo.photoId}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Delete failed");
-  
-      // Eğer varsa kullanıcı yükleme sayısını azalt
+
+      // Kullanıcının uploadedCount azalt
       if (photo.authorParticipantId) {
         try {
           const { db } = getFirebaseClient();
@@ -194,13 +202,12 @@ export default function AdminPage() {
           });
         } catch {}
       }
-  
+
       setPhotos((arr) => arr.filter((p) => p.photoId !== photo.photoId));
     } catch (e) {
       setError("Failed to delete photo");
     }
   }
-  
 
   const totalUploads = useMemo(() => participants.reduce((s, p) => s + (p.uploadedCount || 0), 0), [participants]);
   const filteredPhotos = useMemo(() => {
@@ -223,7 +230,7 @@ export default function AdminPage() {
     if (picks.length === 0) return;
     for (const p of picks) {
       try {
-        const res = await fetch(p.url);
+        const res = await fetch(p.cloudinaryUrl || p.url);
         const blob = await res.blob();
         const fname = `photo-${p.photoId}.jpg`;
         zip.file(fname, blob);
@@ -367,10 +374,15 @@ export default function AdminPage() {
           {filteredPhotos.map((p) => (
             <figure key={p.photoId} className={`border rounded overflow-hidden ${selected.has(p.photoId) ? "ring-2 ring-[var(--retro-accent)]" : ""}`}>
               <label className="flex items-center gap-2 p-2 text-sm">
-                <input className="retro-checkbox" type="checkbox" checked={selected.has(p.photoId)} onChange={() => toggleSelect(p.photoId)} />
+                <input
+                  className="retro-checkbox"
+                  type="checkbox"
+                  checked={selected.has(p.photoId)}
+                  onChange={() => toggleSelect(p.photoId)}
+                />
                 Select
               </label>
-              <img src={p.url} alt="photo" className="w-full h-auto block" />
+              <img src={p.cloudinaryUrl || p.url} alt="photo" className="w-full h-auto block" />
               <div className="flex flex-col gap-1 p-2 text-sm">
                 <span className="truncate">💬 {p.comment || ""}</span>
                 {p.authorParticipantId && (
@@ -392,5 +404,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-
