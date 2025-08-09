@@ -1,8 +1,7 @@
-import { promises as fs } from "fs";
-import path from "path";
 import { v2 as cloudinary } from "cloudinary";
+import { getFirebaseClient } from "@/lib/firebaseClient";
+import { doc, deleteDoc } from "firebase/firestore";
 
-// Cloudinary konfigurasyonu (eğer başka yerde config ettiysen buna gerek yok ama güvenli için ekleyebilirsin)
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -10,39 +9,27 @@ cloudinary.config({
   secure: true,
 });
 
-export async function DELETE(req, { params }) {
-  // Next.js 13 sürümlerinde params bir Promise olabilir, bu yüzden await kullanıyoruz
-  const { eventId, photoId } = await params;
+export async function DELETE(_req, { params }) {
+  const { eventId, photoId } = params;
 
   try {
-    const uploadsDir = path.join(process.cwd(), "uploads", "events", eventId);
-    const metaPath = path.join(uploadsDir, `${photoId}.json`);
+    const { db } = getFirebaseClient();
+    const photoRef = doc(db, "events", eventId, "photos", photoId);
 
-    // Metadata dosyasını oku ki Cloudinary public_id alabilelim
-    let metadata;
-    try {
-      const raw = await fs.readFile(metaPath, "utf8");
-      metadata = JSON.parse(raw);
-    } catch {
-      metadata = null;
+    // Firestore’dan önce public_id çekmeliyiz ki Cloudinary’den silelim
+    const snapshot = await photoRef.get ? await photoRef.get() : null;
+    let publicId = null;
+    if (snapshot && snapshot.exists()) {
+      publicId = snapshot.data().cloudinaryPublicId;
     }
 
-    // Cloudinary fotoğrafını sil
-    if (metadata?.cloudinaryPublicId) {
-      await cloudinary.uploader.destroy(metadata.cloudinaryPublicId, { resource_type: "image" });
+    if (publicId) {
+      await cloudinary.uploader.destroy(publicId, { resource_type: "image" });
     }
 
-    // Local dosyaları sil (opsiyonel, eğer localde varsa)
-    const imgPath = path.join(uploadsDir, `${photoId}.jpg`);
-    try {
-      await fs.unlink(imgPath);
-    } catch {}
+    await deleteDoc(photoRef);
 
-    try {
-      await fs.unlink(metaPath);
-    } catch {}
-
-    return new Response(JSON.stringify({ success: true }), { status: 200 });
+    return new Response(null, { status: 204 });
   } catch (e) {
     console.error(e);
     return new Response(JSON.stringify({ message: "Delete failed", error: e.message }), { status: 500 });

@@ -1,9 +1,8 @@
-import { promises as fs } from "fs";
-import path from "path";
-import { randomUUID } from "crypto";
 import { v2 as cloudinary } from "cloudinary";
+import { getFirebaseClient } from "@/lib/firebaseClient";
+import { randomUUID } from "crypto";
+import { collection, doc, setDoc, getDocs } from "firebase/firestore";
 
-// Cloudinary konfigurasyonu
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -13,7 +12,6 @@ cloudinary.config({
 
 export async function POST(req, { params }) {
   const { eventId } = params;
-
   try {
     const form = await req.formData();
     const file = form.get("file");
@@ -29,7 +27,6 @@ export async function POST(req, { params }) {
     const buffer = Buffer.from(arrayBuffer);
     const photoId = randomUUID();
 
-    // Cloudinary upload stream fonksiyonu
     const streamUpload = () =>
       new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
@@ -50,12 +47,14 @@ export async function POST(req, { params }) {
 
     const result = await streamUpload();
 
-    // Metadata dosyasını local olarak kaydetmek (opsiyonel)
+    // Firestore kaydı
+    const { db } = getFirebaseClient();
+    const photoRef = doc(db, "events", eventId, "photos", photoId);
 
     const metadata = {
       photoId,
       eventId,
-      originalName: typeof file.name === "string" ? file.name : undefined,
+      originalName: typeof file.name === "string" ? file.name : null,
       contentType: file.type || "image/jpeg",
       size: buffer.length,
       comment: comment ? String(comment).slice(0, 250) : null,
@@ -66,6 +65,7 @@ export async function POST(req, { params }) {
       cloudinaryPublicId: result.public_id,
     };
 
+    await setDoc(photoRef, metadata);
 
     return new Response(
       JSON.stringify({
@@ -83,29 +83,20 @@ export async function POST(req, { params }) {
 
 export async function GET(_req, { params }) {
   const { eventId } = params;
-
   try {
-    const uploadsDir = path.join(process.cwd(), "uploads", "events", eventId);
-    const entries = await fs.readdir(uploadsDir, { withFileTypes: true });
-    const metas = entries
-      .filter((e) => e.isFile() && e.name.endsWith(".json"))
-      .map((e) => path.join(uploadsDir, e.name));
+    const { db } = getFirebaseClient();
+    const photosCol = collection(db, "events", eventId, "photos");
+    const snapshot = await getDocs(photosCol);
 
     const photos = [];
-    for (const metaPath of metas) {
-      try {
-        const raw = await fs.readFile(metaPath, "utf8");
-        const meta = JSON.parse(raw);
-        photos.push({ ...meta, url: meta.cloudinaryUrl });
-      } catch {}
-    }
+    snapshot.forEach((doc) => {
+      photos.push({ photoId: doc.id, ...doc.data() });
+    });
+
     photos.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
     return new Response(JSON.stringify({ photos }), { status: 200 });
   } catch (e) {
-    if (e && e.code === "ENOENT") {
-      return new Response(JSON.stringify({ photos: [] }), { status: 200 });
-    }
     console.error(e);
     return new Response(JSON.stringify({ message: "Failed to list" }), { status: 500 });
   }
