@@ -2,43 +2,58 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getFirebaseClient, ensureAnonymousAuth } from "@/lib/firebaseClient";
-import { collection, doc, getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 
 export default function JoinEventPage() {
   const { eventId } = useParams();
   const router = useRouter();
   const [nickname, setNickname] = useState("");
   const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(true); // başta true ki kontrol yapalım
+  const [submitting, setSubmitting] = useState(true); // Başta true ki kontrol yapalım
 
   useEffect(() => {
-    async function checkExistingJoin() {
+    async function checkEventAndJoinStatus() {
       try {
         const { auth, db } = getFirebaseClient();
         await ensureAnonymousAuth(auth);
 
+        // Event bilgilerini çek
+        const eventRef = doc(db, "events", eventId);
+        const eventSnap = await getDoc(eventRef);
+        if (!eventSnap.exists()) {
+          setError("Event not found.");
+          setSubmitting(false);
+          return;
+        }
+        const eventData = eventSnap.data();
+
+        // Event bitmişse (isRevealed true), direkt galeriye yönlendir
+        if (eventData.isRevealed) {
+          router.replace(`/events/${eventId}/gallery`);
+          return;
+        }
+
+        // Daha önce join olmuş mu kontrol et
         const saved = localStorage.getItem(`event-${eventId}-participant`);
         if (saved) {
           const parsed = JSON.parse(saved);
-          // Firestore'da hâlâ kayıt var mı kontrol et
           const participantRef = doc(db, "events", eventId, "participants", parsed.uid);
           const snap = await getDoc(participantRef);
           if (snap.exists()) {
-            // Zaten join yapılmış, direkt camera'ya yönlendir
             router.replace(`/events/${eventId}/camera`);
             return;
           } else {
-            // localStorage'da kayıt var ama Firestore'da yok → temizle
+            // Local'de kayıt var ama Firestore'da yoksa temizle
             localStorage.removeItem(`event-${eventId}-participant`);
           }
         }
       } catch (err) {
         console.error("Join kontrolünde hata:", err);
       }
-      setSubmitting(false); // formu göster
+      setSubmitting(false); // Formu göster
     }
 
-    checkExistingJoin();
+    checkEventAndJoinStatus();
   }, [eventId, router]);
 
   async function handleJoin(e) {
@@ -71,7 +86,7 @@ export default function JoinEventPage() {
         });
       });
 
-      // localStorage'a kaydet
+      // LocalStorage'a kaydet
       localStorage.setItem(
         `event-${eventId}-participant`,
         JSON.stringify({ uid: auth.currentUser.uid, nickname: nick })
