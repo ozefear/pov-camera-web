@@ -391,7 +391,7 @@ export default function AdminPage() {
               </div>
               <div className="flex items-center justify-between p-2 pt-0 text-sm">
                 <button
-                  onClick={() => deletePhoto(p)}
+                  onClick={() => {console.log("test"); deletePhoto(p);}}
                   className="px-2 py-1 rounded bg-red-600 text-white"
                 >
                   🗑️ Delete
