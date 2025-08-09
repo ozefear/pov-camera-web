@@ -386,7 +386,7 @@ export default function AdminPage() {
               <div className="flex flex-col gap-1 p-2 text-sm">
                 <span className="truncate">💬 {p.comment || ""}</span>
                 {p.authorParticipantId && (
-                  <span className="text-xs text-gray-600">👤 by {participants.find(pp => pp.id === p.authorParticipantId)?.nickname || p.authorParticipantId}</span>
+                  <span className="text-xs text-gray-600">👤 @ {participants.find(pp => pp.id === p.authorParticipantId)?.nickname || p.authorParticipantId}</span>
                 )}
               </div>
               <div className="flex items-center justify-between p-2 pt-0 text-sm">
