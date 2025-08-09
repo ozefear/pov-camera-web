@@ -76,7 +76,7 @@ export function renderRetroWithTimestamp(image, options = {}) {
   const metrics = ctx.measureText(ts);
   const x = canvas.width - metrics.width - padding;
   const y = canvas.height - padding;
-  ctx.shadowColor = "rgba(0,0,0,0.6)";
+  ctx.shadowColor = "rgba(0,0,0,1)";
   ctx.shadowBlur = 6;
   ctx.fillStyle = "#f4a261"; // yellow-orange
   ctx.fillText(ts, x, y);
