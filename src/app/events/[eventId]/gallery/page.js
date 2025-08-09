@@ -115,7 +115,7 @@ export default function GalleryPage() {
     if (picks.length === 0) return;
     for (const p of picks) {
       try {
-        const res = await fetch(p.url);
+        const res = await fetch(p.cloudinaryUrl);
         const blob = await res.blob();
         const fname = `photo-${p.photoId}.jpg`;
         zip.file(fname, blob);
@@ -206,7 +206,7 @@ export default function GalleryPage() {
                 Select
               </label>
             )}
-            <img src={p.url} alt="photo" className="w-full h-auto block" />
+            <img src={p.cloudinaryUrl} alt="photo" className="w-full h-auto block" />
             {showComments && (
               <div className="flex flex-col gap-1 p-3 text-sm">
                 {p.comment && (
@@ -216,14 +216,14 @@ export default function GalleryPage() {
                 )}
                 {p.authorParticipantId && (
                   <span className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
-                    👤 by {p.authorNickname || p.authorParticipantId}
+                    👤 @{p.authorNickname || p.authorParticipantId}
                   </span>
                 )}
               </div>
             )}
             {!blurContent && (
               <a
-                href={p.url}
+                href={p.cloudinaryUrl}
                 download={`photo-${p.photoId || p.id || "local"}.jpg`}
                 className="block text-center text-sm p-2 hover:underline"
               >
