@@ -11,7 +11,7 @@ cloudinary.config({
 });
 
 export async function POST(req, { params }) {
-  const { eventId } = params;
+  const { eventId } = await params;
   try {
     const form = await req.formData();
     const file = form.get("file");
@@ -89,7 +89,7 @@ export async function POST(req, { params }) {
 }
 
 export async function GET(_req, { params }) {
-  const { eventId } = params;
+  const { eventId } = await params;
   try {
     const { db } = getFirebaseClient();
     const photosCol = collection(db, "events", eventId, "photos");

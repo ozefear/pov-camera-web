@@ -11,6 +11,7 @@ async function fetchServerPhotos(eventId) {
   return json.photos || [];
 }
 
+
 export default function GalleryPage() {
   const { eventId } = useParams();
   const router = useRouter();
@@ -36,6 +37,7 @@ export default function GalleryPage() {
       .then(async () => {
         const { doc, getDoc, collection, getDocs } = await import("firebase/firestore");
   
+        
         // Önce event verisini çek, isRevealed değerini al
         const eventRef = doc(db, "events", eventId);
         const eventSnap = await getDoc(eventRef);
@@ -45,13 +47,23 @@ export default function GalleryPage() {
         setIsRevealed(revealed);
         if (eventData?.revealAt?.toDate) setRevealAt(eventData.revealAt.toDate());
   
+        
         // Eğer event bitmişse (revealed), katılımcı kontrolü yapma, direkt fotoğrafları getir
         if (revealed) {
           const list = await fetchServerPhotos(eventId);
-          setPhotos(list);
+          try {
+            const partsCol = collection(db, "events", eventId, "participants");
+            const partsSnap = await getDocs(partsCol);
+            const parts = partsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+            const nicknameOf = (pid) => parts.find((p) => p.id === pid)?.nickname || pid;
+            setPhotos(list.map((p) => ({ ...p, authorNickname: nicknameOf(p.authorParticipantId) })));
+          } catch {
+            setPhotos(list);
+          }
           return;
         }
   
+
         // Event bitmemişse katılımcı kontrolü yap
         const partRef = doc(db, "events", eventId, "participants", auth.currentUser.uid);
         const partSnap = await getDoc(partRef);
@@ -61,13 +73,16 @@ export default function GalleryPage() {
         }
   
         setIsOwner(partSnap.data().role === "owner");
-  
+
         // Katılımcı listesi ve fotoğrafları çek
         const list = await fetchServerPhotos(eventId);
         try {
           const partsCol = collection(db, "events", eventId, "participants");
           const partsSnap = await getDocs(partsCol);
           const parts = partsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+          console.log("should come here")
+          
           const nicknameOf = (pid) => parts.find((p) => p.id === pid)?.nickname || pid;
           setPhotos(list.map((p) => ({ ...p, authorNickname: nicknameOf(p.authorParticipantId) })));
         } catch {

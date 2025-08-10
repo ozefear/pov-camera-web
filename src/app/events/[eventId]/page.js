@@ -60,12 +60,42 @@ export default function EventSharePage() {
           <input className="w-full h-11 px-3 rounded border bg-transparent" value={joinUrl} readOnly />
         </div>
         <div className="flex gap-3">
-          <a
-            href={joinUrl}
+          <button
+            type="button"
             className="btn-primary"
+            onClick={() => {
+              const svg = document.querySelector('svg');
+              if (!svg) return;
+              const svgData = new XMLSerializer().serializeToString(svg);
+              const canvas = document.createElement('canvas');
+              const size = svg.getAttribute('width') || 200;
+              canvas.width = canvas.height = size;
+              const ctx = canvas.getContext('2d');
+              const img = new window.Image();
+              const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+              const url = URL.createObjectURL(svgBlob);
+              img.onload = function () {
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                URL.revokeObjectURL(url);
+                canvas.toBlob(function(blob) {
+                  const link = document.createElement('a');
+                  link.href = URL.createObjectURL(blob);
+                  link.download = `event-qr-${eventId}.png`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  setTimeout(() => URL.revokeObjectURL(link.href), 100);
+                }, 'image/png');
+              };
+              img.onerror = function () {
+                URL.revokeObjectURL(url);
+                alert('Failed to convert QR code to PNG.');
+              };
+              img.src = url;
+            }}
           >
-            Open Join Page
-          </a>
+            Download QR Code
+          </button>
           <button
             type="button"
             className="h-11 px-4 rounded-lg border"
