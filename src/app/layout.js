@@ -15,23 +15,25 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "POV Disposable Camera App",
   description: "Create or join an event, capture photos, and reveal the gallery.",
-  openGraph: {
-    title: "POV Disposable Camera App",
-    description: "Create or join an event, capture photos, and reveal the gallery.",
-    images: [
-      {
-        url: "/images/image.png",
-        width: 1200,
-        height: 628,
-        alt: "POV Disposable Camera App",
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "POV Disposable Camera App",
-    description: "Create or join an event, capture photos, and reveal the gallery.",
-    image: "/images/image.png",
+  property: {
+    og: {
+      title: "POV Disposable Camera App",
+      description: "Create or join an event, capture photos, and reveal the gallery.",
+      images: [
+        {
+          url: "/images/image.png",
+          width: 1200,
+          height: 628,
+          alt: "POV Disposable Camera App",
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "POV Disposable Camera App",
+      description: "Create or join an event, capture photos, and reveal the gallery.",
+      image: "/images/image.png",
+    },
   },
 };
 
