@@ -120,19 +120,6 @@ export default function AdminPage() {
       const res = await fetch(`/api/events/${eventId}/photos`, { method: "POST", body: form });
       if (!res.ok) throw new Error("Upload failed");
       const { metadata } = await res.json();
-      // Increment uploadedCount for owner participant
-      try {
-        const { runTransaction, doc } = await import("firebase/firestore");
-        await runTransaction(db, async (tx) => {
-          const partRef = doc(db, "events", eventId, "participants", auth.currentUser.uid);
-          const snap = await tx.get(partRef);
-          const uploaded = snap.exists() ? (snap.data().uploadedCount || 0) : 0;
-          tx.set(partRef, { uploadedCount: uploaded + 1 }, { merge: true });
-        });
-        setParticipants((arr) => arr.map((p) =>
-          p.id === auth.currentUser.uid ? { ...p, uploadedCount: (p.uploadedCount || 0) + 1 } : p
-        ));
-      } catch {}
 
       // Fotoğrafı cloudinaryUrl olarak ekleyelim
       setPhotos((arr) => [{ ...metadata, url: metadata.cloudinaryUrl || "", authorNickname: event?.ownerNickname || "", photoId: metadata.photoId }, ...arr]);
