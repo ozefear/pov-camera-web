@@ -67,6 +67,13 @@ export async function POST(req, { params }) {
 
     await setDoc(photoRef, metadata);
 
+    if (authorParticipantId) {
+      const participantRef = doc(db, "events", eventId, "participants", authorParticipantId);
+      await updateDoc(participantRef, {
+        uploadedCount: increment(1),
+      });
+    }
+
     return new Response(
       JSON.stringify({
         photoId,
