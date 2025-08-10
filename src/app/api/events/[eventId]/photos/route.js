@@ -1,7 +1,7 @@
 import { v2 as cloudinary } from "cloudinary";
 import { getFirebaseClient } from "@/lib/firebaseClient";
 import { randomUUID } from "crypto";
-import { collection, doc, setDoc, getDocs } from "firebase/firestore";
+import { collection, doc, setDoc, getDocs, updateDoc} from "firebase/firestore";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
