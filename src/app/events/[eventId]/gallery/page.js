@@ -247,7 +247,7 @@ export default function GalleryPage() {
                 )}
                 {p.authorParticipantId && (
                   <span className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
-                    👤 @{p.authorNickname || p.authorParticipantId}
+                    👤 @{p.authorNickname}
                   </span>
                 )}
               </div>
