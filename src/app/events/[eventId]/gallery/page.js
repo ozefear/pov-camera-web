@@ -21,7 +21,8 @@ export default function GalleryPage() {
   const [isRevealed, setIsRevealed] = useState(false);
   const [revealAt, setRevealAt] = useState(null);
   const [showComments, setShowComments] = useState(true);
-  const [sortBy, setSortBy] = useState("createdAt");
+  // sortBy: 'createdAt-asc' (oldest), 'createdAt-desc' (newest), 'author'
+  const [sortBy, setSortBy] = useState("createdAt-desc");
   const [countdown, setCountdown] = useState("");
   const [selected, setSelected] = useState(new Set());
   const [modalPhoto, setModalPhoto] = useState(null);
@@ -126,8 +127,10 @@ export default function GalleryPage() {
         if (an === bn) return (b.createdAt || 0) - (a.createdAt || 0);
         return an.localeCompare(bn);
       });
-    } else {
+    } else if (sortBy === "createdAt-asc") {
       arr.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    } else if (sortBy === "createdAt-desc") {
+      arr.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     }
     return arr;
   }, [photos, sortBy]);
@@ -202,7 +205,8 @@ export default function GalleryPage() {
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
               >
-                <option value="createdAt">By Upload Time</option>
+                <option value="createdAt-desc">Newest First</option>
+                <option value="createdAt-asc">Oldest First</option>
                 <option value="author">By Author</option>
               </select>
             </div>

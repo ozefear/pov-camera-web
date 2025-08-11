@@ -75,8 +75,11 @@ export default function CameraPage() {
     }
     setError("");
     setFile(f);
-    const { dataUrl } = await loadImageFromFile(f);
-    setPreviewUrl(dataUrl);
+    // Load and process the image with retro effect and timestamp
+    const { img } = await loadImageFromFile(f);
+    const canvas = renderRetroWithTimestamp(img, { timestamp: new Date() });
+    const processedDataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    setPreviewUrl(processedDataUrl);
   }
 
   async function handleUpload() {
