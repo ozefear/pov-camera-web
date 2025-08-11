@@ -279,13 +279,41 @@ export default function GalleryPage() {
               </div>
             )}
             {!blurContent && (
-              <a
-                href={p.cloudinaryUrl}
-                download={`photo-${p.photoId || p.id || "local"}.jpg`}
-                className="block text-center text-sm p-2 hover:underline"
-              >
-                Download
-              </a>
+              <div className="flex flex-col sm:flex-row gap-2 p-2">
+                <a
+                  href={p.cloudinaryUrl}
+                  download={`photo-${p.photoId || p.id || "local"}.jpg`}
+                  className="btn-primary flex-1 text-sm font-semibold flex items-center justify-center"
+                  style={{ minHeight: '2.25rem', padding: '0.25rem 0.5rem' }}
+                  aria-label="Download photo"
+                >
+                  Download
+                </a>
+                <button
+                  className="btn-primary flex-1 text-sm font-semibold flex items-center justify-center"
+                  style={{ minHeight: '2.25rem', padding: '0.25rem 0.5rem' }}
+                  onClick={async () => {
+                    if (navigator.share) {
+                      try {
+                        await navigator.share({
+                          title: 'Check out this photo!',
+                          url: p.cloudinaryUrl,
+                        });
+                      } catch {}
+                    } else {
+                      try {
+                        await navigator.clipboard.writeText(p.cloudinaryUrl);
+                        alert('Photo link copied!');
+                      } catch {
+                        prompt('Copy photo link:', p.cloudinaryUrl);
+                      }
+                    }
+                  }}
+                  aria-label="Share photo"
+                >
+                  Share
+                </button>
+              </div>
             )}
           </figure>
         ))}

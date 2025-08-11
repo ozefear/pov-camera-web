@@ -1,12 +1,8 @@
 "use client";
-
-
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getFirebaseClient, ensureAnonymousAuth } from "@/lib/firebaseClient";
 import { doc, getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
-import toast from "react-hot-toast";
-
 
 export default function JoinEventPage() {
   const { eventId } = useParams();
@@ -14,8 +10,6 @@ export default function JoinEventPage() {
   const [nickname, setNickname] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(true); // Başta true ki kontrol yapalım
-  const [event, setEvent] = useState(null);
-  const [ownerName, setOwnerName] = useState("");
 
   useEffect(() => {
     async function checkEventAndJoinStatus() {
@@ -32,17 +26,6 @@ export default function JoinEventPage() {
           return;
         }
         const eventData = eventSnap.data();
-        setEvent({ id: eventSnap.id, ...eventData });
-
-        // Event owner bilgisini çek (participants içindeki nickname)
-        if (eventData.ownerId) {
-          const ownerParticipantRef = doc(db, "events", eventId, "participants", eventData.ownerId);
-          const ownerParticipantSnap = await getDoc(ownerParticipantRef);
-          if (ownerParticipantSnap.exists()) {
-            const ownerParticipantData = ownerParticipantSnap.data();
-            setOwnerName(ownerParticipantData.nickname || "");
-          }
-        }
 
         // Event bitmişse (isRevealed true), direkt galeriye yönlendir
         if (eventData.isRevealed) {
@@ -109,10 +92,9 @@ export default function JoinEventPage() {
         JSON.stringify({ uid: auth.currentUser.uid, nickname: nick })
       );
 
-      toast.success("Joined event!");
       router.push(`/events/${eventId}/camera`);
     } catch (err) {
-      toast.error(err.message || "Failed to join. Please try again.");
+      console.error(err);
       setError(err.message || "Failed to join. Please try again.");
     } finally {
       setSubmitting(false);
@@ -127,24 +109,10 @@ export default function JoinEventPage() {
     );
   }
 
-  console.log("Event:", event);
-  console.log("Owner Name:", ownerName);
-
   return (
     <div className="min-h-screen flex items-center justify-center p-8">
       <form onSubmit={handleJoin} className="w-full max-w-md space-y-4 retro-surface p-6">
         <h1 className="text-2xl font-semibold">🙋 Join Event</h1>
-        {event && (
-          <div className="mb-4 retro-surface text-center p-4 border" style={{borderColor: 'var(--retro-border)'}}>
-            <div className="text-xl font-bold" style={{color: 'var(--retro-accent)'}}>{event.name}</div>
-            {ownerName && (
-              <div className="text-sm mt-1" style={{color: 'var(--foreground)'}}>
-                <span className="italic">by </span>
-                <span className="font-semibold not-italic">{ownerName}</span>
-              </div>
-            )}
-          </div>
-        )}
         <p className="text-sm">Enter a unique nickname for this event.</p>
         <input
           className="w-full h-11 px-3 rounded border bg-transparent"
