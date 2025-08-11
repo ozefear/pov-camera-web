@@ -11,7 +11,6 @@ import {
   Timestamp,
 } from "firebase/firestore";
 
-
 export default function NewEventPage() {
   const router = useRouter();
   const [ownerNickname, setOwnerNickname] = useState("");
@@ -72,13 +71,6 @@ export default function NewEventPage() {
     }
   }
 
-  if (submitting) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-    <span>Loading...</span>
-      </div>
-    );
-  }
   return (
     <div className="min-h-screen flex items-center justify-center p-8">
       <form
@@ -86,7 +78,59 @@ export default function NewEventPage() {
         className="w-full max-w-lg space-y-4 retro-surface p-6"
       >
         <h1 className="text-2xl font-semibold">Create Event</h1>
-        {/* ...existing code... */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">Owner Nickname</label>
+          <input
+            className="w-full h-11 px-3 rounded border bg-transparent"
+            value={ownerNickname}
+            onChange={(e) => setOwnerNickname(e.target.value)}
+            placeholder="Your nickname"
+            maxLength={50}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">Event Name</label>
+          <input
+            className="w-full h-11 px-3 rounded border bg-transparent"
+            value={eventName}
+            onChange={(e) => setEventName(e.target.value)}
+            placeholder="e.g., Summer Party"
+            maxLength={80}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">Photo Limit Per User</label>
+          <input
+            type="number"
+            className="w-full h-11 px-3 rounded border bg-transparent"
+            value={photoLimitPerUser}
+            onChange={(e) => setPhotoLimitPerUser(e.target.value)}
+            min={0}
+            max={9999}
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">Event End (optional)</label>
+          <input
+            type="datetime-local"
+            className="w-full h-11 px-3 rounded border bg-transparent"
+            value={revealAt}
+            onChange={(e) => setRevealAt(e.target.value)}
+          />
+          <p className="text-xs text-gray-500">Used for countdown display; owner still ends event to reveal.</p>
+        </div>
+        {error && <p className="text-red-600 text-sm">{error}</p>}
+        <div className="pt-2">
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full h-11 rounded-lg bg-black text-white hover:opacity-90 disabled:opacity-60"
+          >
+            {submitting ? "Creating..." : "Create Event"}
+          </button>
+        </div>
       </form>
     </div>
   );

@@ -3,7 +3,6 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getFirebaseClient, ensureAnonymousAuth } from "@/lib/firebaseClient";
 import { loadImageFromFile, renderRetroWithTimestamp, canvasToBlob } from "@/lib/imageProcessing";
-import toast from "react-hot-toast";
 
 export default function CameraPage() {
   const { eventId } = useParams();
@@ -76,17 +75,15 @@ export default function CameraPage() {
     }
     setError("");
     setFile(f);
-    // Process the image and show the rendered preview
-    const { img } = await loadImageFromFile(f);
-    const canvas = renderRetroWithTimestamp(img, { timestamp: new Date() });
-    setPreviewUrl(canvas.toDataURL("image/jpeg", 0.9));
+    const { dataUrl } = await loadImageFromFile(f);
+    setPreviewUrl(dataUrl);
   }
 
   async function handleUpload() {
     if (!file || !participantOk || isRevealed) return;
     setProcessing(true);
-  setError("");
-  setSuccess(false);
+    setError("");
+    setSuccess(false);
 
     try {
       const { auth, db } = getFirebaseClient();
@@ -133,15 +130,13 @@ export default function CameraPage() {
         }));
       }
 
-  setSuccess(true);
-  toast.success("Uploaded successfully!");
-  setFile(null);
-  setPreviewUrl("");
-  setComment("");
+      setSuccess(true);
+      setFile(null);
+      setPreviewUrl("");
+      setComment("");
     } catch (e) {
       console.error(e);
       setError(e?.message || "Upload failed. Please try again.");
-      toast.error(e?.message || "Upload failed. Please try again.");
     } finally {
       setProcessing(false);
     }
@@ -229,7 +224,8 @@ export default function CameraPage() {
         </div>
       )}
 
-  {/* Toast notifications handle error and success messages visually */}
+      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {success && <p className="text-green-600 text-sm">Uploaded successfully!</p>}
     </div>
   );
 }
