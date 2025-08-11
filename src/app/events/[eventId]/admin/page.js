@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import { useParams, useRouter } from "next/navigation";
 import { getFirebaseClient, ensureAnonymousAuth } from "@/lib/firebaseClient";
 import { QRCodeSVG } from "qrcode.react";
@@ -121,14 +122,15 @@ export default function AdminPage() {
       if (!res.ok) throw new Error("Upload failed");
       const { metadata } = await res.json();
 
-      // Fotoğrafı cloudinaryUrl olarak ekleyelim
       setPhotos((arr) => [{ ...metadata, url: metadata.cloudinaryUrl || "", authorNickname: event?.ownerNickname || "", photoId: metadata.photoId }, ...arr]);
 
       setFile(null);
       setPreviewUrl("");
       setComment("");
+      toast.success("Photo uploaded!");
     } catch (e) {
       setError(e?.message || "Upload failed");
+      toast.error(e?.message || "Upload failed");
     } finally {
       setProcessing(false);
     }
@@ -147,8 +149,10 @@ export default function AdminPage() {
       const eventRef = doc(db, "events", eventId);
       await updateDoc(eventRef, { photoLimitPerUser: limitNumber });
       setEvent((e) => ({ ...(e || {}), photoLimitPerUser: limitNumber }));
+      toast.success("Photo limit updated!");
     } catch (e) {
       setError(e?.message || "Failed to save limit");
+      toast.error(e?.message || "Failed to save limit");
     } finally {
       setSavingLimit(false);
     }
@@ -163,8 +167,10 @@ export default function AdminPage() {
       const eventRef = doc(db, "events", eventId);
       await updateDoc(eventRef, { isRevealed: true });
       setEvent((e) => ({ ...(e || {}), isRevealed: true }));
+      toast.success("Event revealed!");
     } catch (e) {
       setError("Failed to end event");
+      toast.error("Failed to end event");
     } finally {
       setEnding(false);
     }
@@ -191,8 +197,10 @@ export default function AdminPage() {
       }
 
       setPhotos((arr) => arr.filter((p) => p.photoId !== photo.photoId));
+      toast.success("Photo deleted!");
     } catch (e) {
       setError("Failed to delete photo");
+      toast.error("Failed to delete photo");
     }
   }
 
@@ -235,34 +243,36 @@ export default function AdminPage() {
   if (!isOwner) return null;
 
   return (
-    <div className="min-h-screen p-6 max-w-6xl mx-auto space-y-6 retro-surface">
+  <div className="min-h-screen p-6 max-w-6xl mx-auto space-y-6 retro-surface">
       <h1 className="text-2xl font-semibold">Admin Dashboard</h1>
       {error && <p className="text-red-600 text-sm">{error}</p>}
 
       <section className="p-4 border rounded-lg space-y-3">
         <h2 className="font-semibold">⚙️ Event Settings</h2>
-        <div className="flex items-center gap-3">
-          <label className="text-sm">Photo limit per user</label>
-          <input
-            className="h-10 px-3 rounded border bg-transparent w-32"
-            value={limitInput}
-            onChange={(e) => setLimitInput(e.target.value)}
-            placeholder="e.g., 10"
-          />
-          <button
-            disabled={savingLimit}
-            onClick={saveLimit}
-            className="btn-primary disabled:opacity-60"
-          >
-            {savingLimit ? "Saving..." : "Save"}
-          </button>
-          <div className="ml-auto flex items-center gap-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-3">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3 w-full md:w-auto">
+            <label className="text-sm">Photo limit per user</label>
+            <input
+              className="h-10 px-3 rounded border bg-transparent w-full md:w-32"
+              value={limitInput}
+              onChange={(e) => setLimitInput(e.target.value)}
+              placeholder="e.g., 10"
+            />
+            <button
+              disabled={savingLimit}
+              onClick={saveLimit}
+              className="btn-primary disabled:opacity-60 w-full md:w-auto"
+            >
+              {savingLimit ? "Saving..." : "Save"}
+            </button>
+          </div>
+          <div className="flex flex-col gap-2 md:ml-auto md:flex-row md:items-center md:gap-3 w-full md:w-auto">
             <span className="text-sm">🔓 Revealed: {event?.isRevealed ? "Yes" : "No"}</span>
             {!event?.isRevealed && (
               <button
                 disabled={ending}
                 onClick={endEvent}
-                className="btn-primary disabled:opacity-60"
+                className="btn-primary disabled:opacity-60 w-full md:w-auto"
               >
                 {ending ? "Ending..." : "End Event (Reveal)"}
               </button>
@@ -271,14 +281,14 @@ export default function AdminPage() {
         </div>
         <div className="mt-3">
           <h3 className="text-sm font-medium mb-2">🔗 Share Join Link</h3>
-          <div className="grid md:grid-cols-[200px_1fr_auto] gap-3 items-center">
+          <div className="flex flex-col gap-3 md:grid md:grid-cols-[200px_1fr_auto] md:gap-3 md:items-center">
             <div className="flex items-center justify-center p-2 border rounded">
               {joinUrl ? <QRCodeSVG value={joinUrl} size={160} /> : null}
             </div>
-            <input className="h-11 px-3 rounded border bg-transparent" value={joinUrl} readOnly />
+            <input className="h-11 px-3 rounded border bg-transparent w-full" value={joinUrl} readOnly />
             <button
               type="button"
-              className="btn-primary"
+              className="btn-primary w-full md:w-auto"
               onClick={async () => {
                 await navigator.clipboard.writeText(joinUrl);
                 setCopied(true);

@@ -1,9 +1,11 @@
 "use client";
 
+
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getFirebaseClient, ensureAnonymousAuth } from "@/lib/firebaseClient";
 import { doc, getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+import toast from "react-hot-toast";
 
 
 export default function JoinEventPage() {
@@ -107,9 +109,10 @@ export default function JoinEventPage() {
         JSON.stringify({ uid: auth.currentUser.uid, nickname: nick })
       );
 
+      toast.success("Joined event!");
       router.push(`/events/${eventId}/camera`);
     } catch (err) {
-      console.error(err);
+      toast.error(err.message || "Failed to join. Please try again.");
       setError(err.message || "Failed to join. Please try again.");
     } finally {
       setSubmitting(false);

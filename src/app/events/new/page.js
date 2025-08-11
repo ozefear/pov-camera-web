@@ -1,4 +1,5 @@
 "use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getFirebaseClient, ensureAnonymousAuth } from "@/lib/firebaseClient";
@@ -10,6 +11,7 @@ import {
   setDoc,
   Timestamp,
 } from "firebase/firestore";
+import toast from "react-hot-toast";
 
 export default function NewEventPage() {
   const router = useRouter();
@@ -62,9 +64,10 @@ export default function NewEventPage() {
         createdAt: serverTimestamp(),
       });
 
+      toast.success("Event created!");
       router.push(`/events/${eventRef.id}/admin`);
     } catch (err) {
-      console.error(err);
+      toast.error("Failed to create event. Please try again.");
       setError("Failed to create event. Please try again.");
     } finally {
       setSubmitting(false);
