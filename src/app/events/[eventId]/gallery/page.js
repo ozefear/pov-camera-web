@@ -232,13 +232,23 @@ export default function GalleryPage() {
       )}
 
       <div
-  className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 ${blurContent ? "blur-sm" : ""}`}
+  className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 ${blurContent ? "blur-sm" : ""}`}
+        style={{ minHeight: 0 }}
       >
         {sortedPhotos.map((p, idx) => (
           <figure
             key={p.photoId || p.id}
-            className={`rounded border overflow-hidden flex flex-col ${selected.has(p.photoId) ? "ring-2 ring-[var(--retro-accent)]" : ""}`}
-            style={blurContent ? { userSelect: 'none', pointerEvents: 'none' } : {}}
+            className={`rounded overflow-hidden flex flex-col ${selected.has(p.photoId) ? "ring-2 ring-[var(--retro-accent)]" : ""}`}
+            style={Object.assign(
+              {
+                minHeight: '420px',
+                minWidth: '0',
+                height: '100%',
+                maxWidth: '100%',
+                boxShadow: '0 2px 8px 0 rgba(80, 40, 10, 0.18), 0 1px 3px 0 rgba(80, 40, 10, 0.12)',
+              },
+              blurContent ? { userSelect: 'none', pointerEvents: 'none' } : {}
+            )}
           >
             {!blurContent && (
               <label className="flex items-center gap-2 p-2 text-sm">
@@ -254,8 +264,12 @@ export default function GalleryPage() {
             <img
               src={p.cloudinaryUrl}
               alt={p.comment ? `Photo: ${p.comment}` : "photo"}
-              className={`w-full h-auto block ${blurContent ? "select-none" : "cursor-pointer"}`}
-              style={blurContent ? { filter: 'blur(16px)', pointerEvents: 'none', outline: 'none' } : { outline: 'none' }}
+              className={`block mx-auto rounded ${blurContent ? "select-none" : "cursor-pointer"}`}
+              style={Object.assign(
+                {},
+                blurContent ? { filter: 'blur(16px)', pointerEvents: 'none', outline: 'none' } : { outline: 'none' },
+                { width: '95%', boxShadow: '0 2px 12px 0 rgba(80, 40, 10, 0.28)' }
+              )}
               onClick={e => {
                 if (blurContent) { e.preventDefault(); return; }
                 setModalPhoto({ ...p, idx });
