@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { Fragment } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getFirebaseClient, ensureAnonymousAuth } from "@/lib/firebaseClient";
 import JSZip from "jszip";
@@ -23,6 +24,7 @@ export default function GalleryPage() {
   const [sortBy, setSortBy] = useState("createdAt");
   const [countdown, setCountdown] = useState("");
   const [selected, setSelected] = useState(new Set());
+  const [modalPhoto, setModalPhoto] = useState(null);
 
   useEffect(() => {
     const urls = [];
@@ -230,16 +232,13 @@ export default function GalleryPage() {
       )}
 
       <div
-        className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 ${
-          blurContent ? "blur-sm" : ""
-        }`}
+  className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 ${blurContent ? "blur-sm" : ""}`}
       >
-        {sortedPhotos.map((p) => (
+        {sortedPhotos.map((p, idx) => (
           <figure
             key={p.photoId || p.id}
-            className={`rounded border overflow-hidden flex flex-col ${
-              selected.has(p.photoId) ? "ring-2 ring-[var(--retro-accent)]" : ""
-            }`}
+            className={`rounded border overflow-hidden flex flex-col ${selected.has(p.photoId) ? "ring-2 ring-[var(--retro-accent)]" : ""}`}
+            style={blurContent ? { userSelect: 'none', pointerEvents: 'none' } : {}}
           >
             {!blurContent && (
               <label className="flex items-center gap-2 p-2 text-sm">
@@ -252,7 +251,19 @@ export default function GalleryPage() {
                 Select
               </label>
             )}
-            <img src={p.cloudinaryUrl} alt="photo" className="w-full h-auto block" />
+            <img
+              src={p.cloudinaryUrl}
+              alt={p.comment ? `Photo: ${p.comment}` : "photo"}
+              className={`w-full h-auto block ${blurContent ? "select-none" : "cursor-pointer"}`}
+              style={blurContent ? { filter: 'blur(16px)', pointerEvents: 'none', outline: 'none' } : { outline: 'none' }}
+              onClick={e => {
+                if (blurContent) { e.preventDefault(); return; }
+                setModalPhoto({ ...p, idx });
+              }}
+              tabIndex={blurContent ? -1 : 0}
+              draggable={blurContent ? false : true}
+              onContextMenu={blurContent ? (e) => e.preventDefault() : undefined}
+            />
             {showComments && (
               <div className="flex flex-col gap-1 p-3 text-sm">
                 {p.comment && (
@@ -279,6 +290,65 @@ export default function GalleryPage() {
           </figure>
         ))}
       </div>
+
+      {/* Photo Preview Modal */}
+      {modalPhoto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70" onClick={() => setModalPhoto(null)}>
+          <div className="relative bg-white rounded-lg shadow-lg max-w-full max-h-full flex flex-col items-center p-4" style={{ minWidth: '320px', minHeight: '200px' }} onClick={e => e.stopPropagation()}>
+            <div className="w-full flex justify-end mb-2">
+              <button
+                className="text-2xl text-gray-700 hover:text-black focus:outline-none"
+                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                onClick={() => setModalPhoto(null)}
+                aria-label="Close preview"
+                tabIndex={0}
+              >
+                ×
+              </button>
+            </div>
+            <img
+              src={modalPhoto.cloudinaryUrl}
+              alt={modalPhoto.comment ? `Photo: ${modalPhoto.comment}` : "photo"}
+              className="max-h-[70vh] max-w-full rounded mb-2"
+            />
+            {modalPhoto.comment && (
+              <div className="text-center text-base text-orange-700 mb-1">💬 {modalPhoto.comment}</div>
+            )}
+            {modalPhoto.authorNickname && (
+              <div className="text-center text-xs text-gray-600 mb-2">👤 @{modalPhoto.authorNickname}</div>
+            )}
+            <div className="flex gap-3">
+              <button
+                className="btn-primary"
+                onClick={() => {
+                  const prevIdx = (modalPhoto.idx - 1 + sortedPhotos.length) % sortedPhotos.length;
+                  setModalPhoto({ ...sortedPhotos[prevIdx], idx: prevIdx });
+                }}
+                aria-label="Previous photo"
+              >
+                ◀ Prev
+              </button>
+              <a
+                href={modalPhoto.cloudinaryUrl}
+                download={`photo-${modalPhoto.photoId || modalPhoto.id || "local"}.jpg`}
+                className="btn-primary"
+              >
+                Download
+              </a>
+              <button
+                className="btn-primary"
+                onClick={() => {
+                  const nextIdx = (modalPhoto.idx + 1) % sortedPhotos.length;
+                  setModalPhoto({ ...sortedPhotos[nextIdx], idx: nextIdx });
+                }}
+                aria-label="Next photo"
+              >
+                Next ▶
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
