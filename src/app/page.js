@@ -1,3 +1,5 @@
+import { Analytics } from "@vercel/analytics/next"
+
 export default function Home() {
   return (
     <div className="min-h-screen flex items-center justify-center p-8">
@@ -16,6 +18,8 @@ export default function Home() {
           </a>
         </div>
       </main>
+      <Analytics />
     </div>
+    
   );
 }
