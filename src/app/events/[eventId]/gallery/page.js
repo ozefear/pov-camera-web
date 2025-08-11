@@ -307,20 +307,32 @@ export default function GalleryPage() {
                   className="btn-primary flex-1 text-sm font-semibold flex items-center justify-center"
                   style={{ minHeight: '2.25rem', padding: '0.25rem 0.5rem' }}
                   onClick={async () => {
+                    if (navigator.canShare && navigator.canShare({ files: [new File([new Blob()], 'x.jpg', { type: 'image/jpeg' })] })) {
+                      try {
+                        const res = await fetch(p.cloudinaryUrl);
+                        const blob = await res.blob();
+                        const file = new File([blob], `photo-${p.photoId || p.id || 'image'}.jpg`, { type: blob.type || 'image/jpeg' });
+                        await navigator.share({
+                          title: 'Check out this photo!',
+                          files: [file],
+                        });
+                        return;
+                      } catch {}
+                    }
                     if (navigator.share) {
                       try {
                         await navigator.share({
                           title: 'Check out this photo!',
                           url: p.cloudinaryUrl,
                         });
+                        return;
                       } catch {}
-                    } else {
-                      try {
-                        await navigator.clipboard.writeText(p.cloudinaryUrl);
-                        alert('Photo link copied!');
-                      } catch {
-                        prompt('Copy photo link:', p.cloudinaryUrl);
-                      }
+                    }
+                    try {
+                      await navigator.clipboard.writeText(p.cloudinaryUrl);
+                      alert('Photo link copied!');
+                    } catch {
+                      prompt('Copy photo link:', p.cloudinaryUrl);
                     }
                   }}
                   aria-label="Share photo"
