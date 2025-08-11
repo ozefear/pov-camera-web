@@ -1,9 +1,12 @@
 "use client";
 
+
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getFirebaseClient, ensureAnonymousAuth } from "@/lib/firebaseClient";
 import { doc, getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+
+import toast from "react-hot-toast";
 
 
 export default function JoinEventPage() {
@@ -73,10 +76,11 @@ export default function JoinEventPage() {
 
   async function handleJoin(e) {
     e.preventDefault();
-    setError("");
+  setError("");
     const nick = nickname.trim();
     if (!nick) {
       setError("Please enter a nickname.");
+      toast.error("Please enter a nickname.");
       return;
     }
     setSubmitting(true);
@@ -107,19 +111,22 @@ export default function JoinEventPage() {
         JSON.stringify({ uid: auth.currentUser.uid, nickname: nick })
       );
 
-      router.push(`/events/${eventId}/camera`);
+  toast.success("Joined event!");
+  router.push(`/events/${eventId}/camera`);
     } catch (err) {
       console.error(err);
       setError(err.message || "Failed to join. Please try again.");
+      toast.error(err.message || "Failed to join. Please try again.");
     } finally {
       setSubmitting(false);
     }
   }
 
+
   if (submitting) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p>Loading...</p>
+        <span>Loading...</span>
       </div>
     );
   }
@@ -150,7 +157,7 @@ export default function JoinEventPage() {
           maxLength={50}
           placeholder="Your nickname"
         />
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+  {/* Toast notifications handle error and success messages visually */}
         <button
           disabled={submitting}
           className="w-full btn-primary disabled:opacity-60"

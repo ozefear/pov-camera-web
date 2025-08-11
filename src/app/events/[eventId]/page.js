@@ -6,6 +6,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 
+
 export default function EventSharePage() {
   const params = useParams();
   const eventId = params?.eventId;

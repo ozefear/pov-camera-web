@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { getFirebaseClient, ensureAnonymousAuth } from "@/lib/firebaseClient";
 import JSZip from "jszip";
 
+
 async function fetchServerPhotos(eventId) {
   const res = await fetch(`/api/events/${eventId}/photos`, { cache: "no-store" });
   if (!res.ok) return [];
